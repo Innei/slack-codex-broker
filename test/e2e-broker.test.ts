@@ -13,6 +13,7 @@ import { MockCodexAppServer } from "./helpers/mock-codex-app-server.js";
 import { MockSlackServer } from "./manual/mock-slack-server.js";
 
 const brokerRoot = path.dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
+const DEFAULT_E2E_TIMEOUT_MS = process.env.CI ? 30_000 : 15_000;
 
 describe.sequential("slack-codex-broker e2e", () => {
   const cleanups: Array<() => Promise<void>> = [];
@@ -407,7 +408,7 @@ async function startBrokerProcess(options: {
   };
 }
 
-async function waitForHttpReady(url: string, logs: readonly string[], timeoutMs = 15_000): Promise<void> {
+async function waitForHttpReady(url: string, logs: readonly string[], timeoutMs = DEFAULT_E2E_TIMEOUT_MS): Promise<void> {
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
@@ -426,7 +427,7 @@ async function waitForHttpReady(url: string, logs: readonly string[], timeoutMs 
   throw new Error(`Timed out waiting for broker readiness: ${url}\n${logs.join("")}`);
 }
 
-async function waitFor(predicate: () => boolean, label: string, timeoutMs = 15_000): Promise<void> {
+async function waitFor(predicate: () => boolean, label: string, timeoutMs = DEFAULT_E2E_TIMEOUT_MS): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (predicate()) {
@@ -441,7 +442,7 @@ async function waitFor(predicate: () => boolean, label: string, timeoutMs = 15_0
 async function waitForSessionIdle(
   tempRoot: string,
   sessionKey: string,
-  timeoutMs = 15_000
+  timeoutMs = DEFAULT_E2E_TIMEOUT_MS
 ): Promise<void> {
   const sessionFile = path.join(
     tempRoot,
