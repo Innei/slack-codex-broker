@@ -26,12 +26,15 @@ import {
   chunkSlackMessage,
   clampHistoryLimit,
   compareIsoTimestamp,
+  createSlackFailureFingerprint,
   formatSlackRunFailureMessage,
   isBeforeSlackTs,
+  isMissingCodexThreadError,
   isRecoverableCodexTurnFailure,
   parseActiveTurnMismatch,
   isMissingActiveTurnSteerError,
   isSlackMessageAfterCursor,
+  shouldNotifySlackFailure,
   shouldAutoRecoverSession
 } from "./slack-conversation-utils.js";
 import { SlackInboundStore } from "./slack-inbound-store.js";
@@ -47,6 +50,10 @@ interface RuntimeSessionState {
   processing: boolean;
   generation: number;
   autoResumeTimer?: NodeJS.Timeout | undefined;
+  blockedUntilMs?: number | undefined;
+  blockedFailureFingerprint?: string | undefined;
+  lastFailureNotificationFingerprint?: string | undefined;
+  lastFailureNotificationAtMs?: number | undefined;
 }
 
 interface PendingDispatchRequest {
@@ -55,6 +62,7 @@ interface PendingDispatchRequest {
 }
 
 const AUTO_RESUME_AFTER_FAILURE_MS = 5_000;
+const NONRECOVERABLE_DISPATCH_RETRY_COOLDOWN_MS = 5 * 60 * 1_000;
 
 export class SlackConversationService {
   readonly #config: AppConfig;
@@ -372,6 +380,7 @@ export class SlackConversationService {
       return;
     }
 
+    this.#clearDispatchFailureBlock(session.key);
     const recordedSession = await this.#inboundStore.recordInboundMessage(session, item);
     await this.#dispatchPersistedMessage(recordedSession, item.messageTs);
   }
@@ -677,6 +686,8 @@ export class SlackConversationService {
 
   #enqueueDispatch(session: SlackSessionRecord, request: PendingDispatchRequest): void {
     const runtime = this.#getRuntimeSession(session.key);
+    runtime.blockedUntilMs = undefined;
+    runtime.blockedFailureFingerprint = undefined;
     const existing = runtime.queue.find((entry) => entry.kind === "dispatch_pending");
 
     if (existing) {
@@ -888,14 +899,41 @@ export class SlackConversationService {
           rootThreadTs: session.rootThreadTs,
           error: error instanceof Error ? error.message : String(error)
         });
-        await this.#postBotThreadMessage(
-          session.channelId,
-          session.rootThreadTs,
-          formatSlackRunFailureMessage(error)
-        );
+        const nowMs = Date.now();
+        if (shouldNotifySlackFailure({
+          previousFingerprint: runtime.lastFailureNotificationFingerprint,
+          previousNotifiedAtMs: runtime.lastFailureNotificationAtMs,
+          error,
+          nowMs
+        })) {
+          await this.#postBotThreadMessage(
+            session.channelId,
+            session.rootThreadTs,
+            formatSlackRunFailureMessage(error)
+          );
+          runtime.lastFailureNotificationFingerprint = createSlackFailureFingerprint(error);
+          runtime.lastFailureNotificationAtMs = nowMs;
+        } else {
+          logger.warn("Suppressing duplicate Slack run failure notification", {
+            sessionKey,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
         await this.#sessions.setActiveTurnId(session.channelId, session.rootThreadTs, undefined);
-        if (isRecoverableCodexTurnFailure(error) || isMissingActiveTurnSteerError(error)) {
+        if (
+          isRecoverableCodexTurnFailure(error) ||
+          isMissingActiveTurnSteerError(error) ||
+          isMissingCodexThreadError(error)
+        ) {
           this.#scheduleAutoResume(session.key);
+        } else {
+          runtime.blockedUntilMs = nowMs + NONRECOVERABLE_DISPATCH_RETRY_COOLDOWN_MS;
+          runtime.blockedFailureFingerprint = createSlackFailureFingerprint(error);
+          logger.warn("Pausing automatic retries for a session after non-recoverable dispatch failure", {
+            sessionKey,
+            blockedUntilMs: runtime.blockedUntilMs,
+            error: error instanceof Error ? error.message : String(error)
+          });
         }
         break;
       }
@@ -934,6 +972,12 @@ export class SlackConversationService {
     const runtime = this.#getRuntimeSession(sessionKey);
     runtime.generation += 1;
     runtime.processing = false;
+  }
+
+  #clearDispatchFailureBlock(sessionKey: string): void {
+    const runtime = this.#getRuntimeSession(sessionKey);
+    runtime.blockedUntilMs = undefined;
+    runtime.blockedFailureFingerprint = undefined;
   }
 
   #scheduleAutoResume(sessionKey: string): void {
@@ -1019,6 +1063,7 @@ export class SlackConversationService {
   }
 
   async #recoverDormantPendingSessions(): Promise<void> {
+    const nowMs = Date.now();
     const sessions = this.#sessions
       .listSessions()
       .filter((session) => !session.activeTurnId)
@@ -1027,6 +1072,10 @@ export class SlackConversationService {
     for (const session of sessions) {
       const runtime = this.#getRuntimeSession(session.key);
       if (runtime.processing) {
+        continue;
+      }
+
+      if (runtime.blockedUntilMs && runtime.blockedUntilMs > nowMs) {
         continue;
       }
 

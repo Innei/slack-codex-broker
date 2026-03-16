@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createSlackFailureFingerprint,
   formatSlackRunFailureMessage,
+  isMissingCodexThreadError,
   isMissingActiveTurnSteerError,
-  parseActiveTurnMismatch
+  parseActiveTurnMismatch,
+  shouldNotifySlackFailure
 } from "../src/services/slack/slack-conversation-utils.js";
 
 describe("slack conversation utils", () => {
@@ -50,9 +53,35 @@ describe("slack conversation utils", () => {
     );
   });
 
+  it("detects missing codex thread errors", () => {
+    expect(isMissingCodexThreadError(new Error("no rollout found for thread id 019cf4fd"))).toBe(true);
+  });
+
+  it("formats missing codex thread errors for Slack users", () => {
+    expect(
+      formatSlackRunFailureMessage(new Error("no rollout found for thread id 019cf4fd"))
+    ).toBe(
+      "I lost my previous runtime state for this thread. I am resetting the session and will continue from the latest state."
+    );
+  });
+
   it("formats generic failures for Slack users", () => {
     expect(formatSlackRunFailureMessage(new Error("something unexpected happened"))).toBe(
       "I hit an internal issue while working on this thread. Send a quick follow-up and I will continue from the latest state."
     );
+  });
+
+  it("suppresses duplicate failure notifications within the cooldown window", () => {
+    const error = new Error("no rollout found for thread id 019cf4fd");
+    const fingerprint = createSlackFailureFingerprint(error);
+
+    expect(
+      shouldNotifySlackFailure({
+        previousFingerprint: fingerprint,
+        previousNotifiedAtMs: 10_000,
+        error,
+        nowMs: 10_100
+      })
+    ).toBe(false);
   });
 });

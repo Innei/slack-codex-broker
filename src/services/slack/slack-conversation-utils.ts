@@ -1,6 +1,7 @@
 import type { PersistedInboundSource, SlackInboundSource, SlackSessionRecord } from "../../types.js";
 
 const AUTO_RECOVERY_SESSION_LOOKBACK_MS = 14 * 24 * 60 * 60 * 1_000;
+const DEFAULT_FAILURE_NOTIFICATION_COOLDOWN_MS = 5 * 60 * 1_000;
 
 export function chunkSlackMessage(text: string, chunkSize = 3_500): string[] {
   const normalized = text.trim();
@@ -93,11 +94,48 @@ export function isRecoverableCodexTurnFailure(error: unknown): boolean {
   ].some((pattern) => message.includes(pattern));
 }
 
+export function isMissingCodexThreadError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    /no rollout found for thread id/i.test(message) ||
+    /thread .* not found/i.test(message) ||
+    /unknown thread/i.test(message)
+  );
+}
+
+export function createSlackFailureFingerprint(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.trim().replace(/\s+/g, " ");
+}
+
+export function shouldNotifySlackFailure(options: {
+  readonly previousFingerprint?: string | undefined;
+  readonly previousNotifiedAtMs?: number | undefined;
+  readonly error: unknown;
+  readonly nowMs: number;
+  readonly cooldownMs?: number | undefined;
+}): boolean {
+  const fingerprint = createSlackFailureFingerprint(options.error);
+  if (!options.previousFingerprint || options.previousNotifiedAtMs === undefined) {
+    return true;
+  }
+
+  if (options.previousFingerprint !== fingerprint) {
+    return true;
+  }
+
+  return options.nowMs - options.previousNotifiedAtMs >= (options.cooldownMs ?? DEFAULT_FAILURE_NOTIFICATION_COOLDOWN_MS);
+}
+
 export function formatSlackRunFailureMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
 
   if (isRecoverableCodexTurnFailure(error)) {
     return "I lost my connection while working on this thread. I will resume as soon as the connection comes back.";
+  }
+
+  if (isMissingCodexThreadError(error)) {
+    return "I lost my previous runtime state for this thread. I am resetting the session and will continue from the latest state.";
   }
 
   if (isMissingActiveTurnSteerError(error)) {

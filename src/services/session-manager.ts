@@ -79,7 +79,11 @@ export class SessionManager {
     });
   }
 
-  async setCodexThreadId(channelId: string, rootThreadTs: string, codexThreadId: string): Promise<SlackSessionRecord> {
+  async setCodexThreadId(
+    channelId: string,
+    rootThreadTs: string,
+    codexThreadId: string | undefined
+  ): Promise<SlackSessionRecord> {
     const session = this.#requireSession(channelId, rootThreadTs);
     const next: SlackSessionRecord = {
       ...session,

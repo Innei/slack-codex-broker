@@ -10,7 +10,10 @@ import { SessionManager } from "../session-manager.js";
 import { SlackApi } from "./slack-api.js";
 import { formatSlackMessageForCodex } from "./slack-message-format.js";
 import { SlackInboundStore } from "./slack-inbound-store.js";
-import { isRecoverableCodexTurnFailure } from "./slack-conversation-utils.js";
+import {
+  isMissingCodexThreadError,
+  isRecoverableCodexTurnFailure
+} from "./slack-conversation-utils.js";
 
 export class SlackTurnRunner {
   readonly #codex: CodexBroker;
@@ -169,8 +172,23 @@ export class SlackTurnRunner {
 
   async #ensureCodexThreadInternal(session: SlackSessionRecord): Promise<SlackSessionRecord> {
     if (session.codexThreadId) {
-      await this.#codex.ensureThread(session);
-      return session;
+      try {
+        await this.#codex.ensureThread(session);
+        return session;
+      } catch (error) {
+        if (!isMissingCodexThreadError(error)) {
+          throw error;
+        }
+
+        logger.warn("Stored Codex thread id no longer exists; resetting broker session thread state", {
+          sessionKey: session.key,
+          codexThreadId: session.codexThreadId,
+          error: error instanceof Error ? error.message : String(error)
+        });
+
+        session = await this.#sessions.setActiveTurnId(session.channelId, session.rootThreadTs, undefined);
+        session = await this.#sessions.setCodexThreadId(session.channelId, session.rootThreadTs, undefined);
+      }
     }
 
     const codexThreadId = await this.#codex.ensureThread(session);

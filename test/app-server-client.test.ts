@@ -509,6 +509,9 @@ describe("AppServerClient disconnect handling", () => {
       expect.stringContaining("Do not assume it is addressed to you")
     );
     expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("bias toward sending a short direct Slack answer")
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
       expect.stringContaining("BROKER_JOB_HELPER")
     );
     expect(threadStartParams?.baseInstructions).toEqual(
