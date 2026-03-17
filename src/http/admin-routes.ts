@@ -756,16 +756,35 @@ function renderAdminPage(options: {
       gap: 8px;
       min-width: 0;
     }
+    .auth-file-title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
     .auth-file-head {
       display: flex;
       justify-content: space-between;
       gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
+      align-items: start;
     }
     .auth-file-title {
       font-size: 13px;
       font-weight: 650;
+    }
+    .auth-file-tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 2px 8px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.02);
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
     }
     .auth-file-copy {
       font-size: 11px;
@@ -787,10 +806,14 @@ function renderAdminPage(options: {
     }
     .auth-file-actions {
       display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
+      align-items: flex-start;
       justify-content: flex-end;
+      padding-top: 2px;
+    }
+    .auth-file-actions button {
+      min-width: 88px;
+      padding: 7px 12px;
+      font-size: 12px;
     }
     @media (max-width: 960px) {
       .span-4, .span-5, .span-6, .span-7, .span-8, .span-12 {
@@ -905,7 +928,10 @@ function renderAdminPage(options: {
               <div class="auth-file-row">
                 <div class="auth-file-main">
                   <div class="auth-file-head">
-                    <div class="auth-file-title mono">auth.json</div>
+                    <div class="auth-file-title-group">
+                      <div class="auth-file-title mono">auth.json</div>
+                      <div class="auth-file-tag">常用</div>
+                    </div>
                     <div id="auth-file-auth-badge"></div>
                   </div>
                   <div class="auth-file-meta" id="auth-file-auth-meta"></div>
@@ -913,13 +939,15 @@ function renderAdminPage(options: {
                 </div>
                 <div class="auth-file-actions">
                   <button id="open-auth-dialog">替换</button>
-                  <div class="badge good">常用</div>
                 </div>
               </div>
               <div class="auth-file-row">
                 <div class="auth-file-main">
                   <div class="auth-file-head">
-                    <div class="auth-file-title mono">.credentials.json</div>
+                    <div class="auth-file-title-group">
+                      <div class="auth-file-title mono">.credentials.json</div>
+                      <div class="auth-file-tag">MCP</div>
+                    </div>
                     <div id="auth-file-credentials-badge"></div>
                   </div>
                   <div class="auth-file-meta" id="auth-file-credentials-meta"></div>
@@ -927,13 +955,15 @@ function renderAdminPage(options: {
                 </div>
                 <div class="auth-file-actions">
                   <button id="open-credentials-dialog" class="secondary">替换</button>
-                  <div class="badge">MCP</div>
                 </div>
               </div>
               <div class="auth-file-row">
                 <div class="auth-file-main">
                   <div class="auth-file-head">
-                    <div class="auth-file-title mono">config.toml</div>
+                    <div class="auth-file-title-group">
+                      <div class="auth-file-title mono">config.toml</div>
+                      <div class="auth-file-tag">配置</div>
+                    </div>
                     <div id="auth-file-config-badge"></div>
                   </div>
                   <div class="auth-file-meta" id="auth-file-config-meta"></div>
@@ -941,7 +971,6 @@ function renderAdminPage(options: {
                 </div>
                 <div class="auth-file-actions">
                   <button id="open-config-dialog" class="secondary">替换</button>
-                  <div class="badge">配置</div>
                 </div>
               </div>
             </div>
