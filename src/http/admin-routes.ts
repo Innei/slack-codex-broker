@@ -122,108 +122,96 @@ function renderAdminPage(options: {
   <style>
     :root {
       color-scheme: dark;
-      --bg: #ff972f;
-      --bg-deep: #e57d17;
-      --panel: #080808;
-      --panel-soft: #0b0b0b;
-      --panel-strong: #050505;
-      --line: rgba(255, 155, 47, 0.15);
-      --line-strong: rgba(255, 155, 47, 0.34);
+      --bg: #ff962d;
+      --bg-deep: #d97414;
+      --panel: #070707;
+      --panel-soft: #0a0a0a;
+      --panel-strong: #030303;
+      --line: rgba(255, 154, 47, 0.15);
+      --line-strong: rgba(255, 154, 47, 0.34);
       --text: #fff1de;
-      --muted: #a08d75;
-      --accent: #ff9b2f;
-      --accent-soft: rgba(255, 155, 47, 0.14);
-      --good: #31d88a;
-      --good-soft: rgba(49, 216, 138, 0.12);
-      --warn: #ffc155;
-      --warn-soft: rgba(255, 193, 85, 0.14);
-      --danger: #ff6e53;
-      --danger-soft: rgba(255, 110, 83, 0.14);
-      --mono: "SF Mono", "IBM Plex Mono", "JetBrains Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
-      --sans: "SF Mono", "IBM Plex Mono", "JetBrains Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+      --muted: #a48f75;
+      --accent: #ff9a2f;
+      --accent-soft: rgba(255, 154, 47, 0.12);
+      --good: #34dd93;
+      --good-soft: rgba(52, 221, 147, 0.12);
+      --warn: #ffcb63;
+      --warn-soft: rgba(255, 203, 99, 0.14);
+      --danger: #ff7458;
+      --danger-soft: rgba(255, 116, 88, 0.14);
+      --mono: "IBM Plex Mono", "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+      --sans: "IBM Plex Mono", "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
     }
     body {
       margin: 0;
       min-height: 100vh;
       background:
-        radial-gradient(circle at 16% 14%, rgba(255, 203, 140, 0.32), transparent 0 18%),
-        radial-gradient(circle at 84% 12%, rgba(255, 210, 150, 0.25), transparent 0 16%),
-        linear-gradient(145deg, rgba(255,255,255,0.07) 0 4%, transparent 4% 15%, rgba(255,255,255,0.05) 15% 18%, transparent 18% 34%, rgba(255,255,255,0.06) 34% 37%, transparent 37% 100%),
+        radial-gradient(circle at 14% 12%, rgba(255, 198, 122, 0.32), transparent 0 18%),
+        radial-gradient(circle at 86% 10%, rgba(255, 206, 139, 0.22), transparent 0 16%),
+        linear-gradient(135deg, rgba(255,255,255,0.05) 0 4%, transparent 4% 14%, rgba(255,255,255,0.03) 14% 17%, transparent 17% 31%, rgba(255,255,255,0.04) 31% 35%, transparent 35% 100%),
         linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
       color: var(--text);
       font-family: var(--sans);
       letter-spacing: 0.01em;
     }
     .wrap {
-      max-width: 1640px;
+      max-width: 1720px;
       margin: 0 auto;
-      padding: 28px;
+      padding: 24px;
     }
     .dashboard {
-      border: 1px solid rgba(255, 155, 47, 0.24);
-      background: linear-gradient(180deg, rgba(8, 8, 8, 0.995), rgba(4, 4, 4, 0.995));
-      border-radius: 16px;
+      border: 1px solid rgba(255, 154, 47, 0.24);
+      border-radius: 18px;
+      background:
+        linear-gradient(180deg, rgba(10, 10, 10, 0.995), rgba(3, 3, 3, 0.995));
       box-shadow:
-        0 24px 70px rgba(82, 32, 0, 0.28),
-        inset 0 0 0 1px rgba(255,255,255,0.02);
-      padding: 12px;
+        0 30px 70px rgba(92, 34, 0, 0.28),
+        inset 0 0 0 1px rgba(255,255,255,0.015);
+      padding: 16px;
     }
     h1, h2, h3 {
       margin: 0;
-      font-weight: 650;
-      letter-spacing: -0.02em;
+      font-weight: 700;
+      letter-spacing: 0.02em;
     }
     h1 {
       font-size: 22px;
-      margin-bottom: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    h2 {
+      font-size: 13px;
       text-transform: uppercase;
       letter-spacing: 0.08em;
     }
-    h2 {
-      font-size: 14px;
-      margin-bottom: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
     h3 {
-      font-size: 13px;
-      margin-bottom: 2px;
+      font-size: 12px;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
     }
     p {
       margin: 0;
       color: var(--muted);
-      line-height: 1.35;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(12, minmax(0, 1fr));
-      gap: 14px;
+      line-height: 1.45;
     }
     .card {
-      background: var(--panel);
+      background: rgba(7, 7, 7, 0.96);
       border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 12px;
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.015);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.01);
     }
-    .span-4 { grid-column: span 4; }
-    .span-5 { grid-column: span 5; }
-    .span-6 { grid-column: span 6; }
-    .span-7 { grid-column: span 7; }
-    .span-8 { grid-column: span 8; }
-    .span-12 { grid-column: span 12; }
     .headerbar {
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 12px;
-      margin-bottom: 10px;
-      padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.012);
+      margin-bottom: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--line-strong);
+      border-radius: 14px;
+      background:
+        linear-gradient(180deg, rgba(255, 154, 47, 0.03), rgba(255, 154, 47, 0.01));
     }
     .header-main {
       display: grid;
@@ -233,14 +221,15 @@ function renderAdminPage(options: {
     .header-subtitle {
       color: var(--muted);
       font-size: 11px;
-      line-height: 1.3;
+      line-height: 1.35;
       text-transform: uppercase;
     }
     .header-meta {
       display: flex;
-      gap: 8px;
       flex-wrap: wrap;
+      gap: 8px;
       align-items: center;
+      justify-content: flex-end;
     }
     .summary-strip {
       display: grid;
@@ -249,53 +238,64 @@ function renderAdminPage(options: {
       margin-bottom: 12px;
     }
     .summary-pill {
+      display: grid;
+      gap: 4px;
+      min-height: 82px;
+      padding: 10px 12px;
       background: var(--panel-soft);
       border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 8px 10px;
-      position: relative;
-      overflow: hidden;
-    }
-    .summary-pill::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 3px;
-      background: var(--accent);
+      border-radius: 12px;
     }
     .summary-pill-label {
       color: var(--muted);
-      font-size: 11px;
-      margin-bottom: 4px;
+      font-size: 10px;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.08em;
     }
     .summary-pill-value {
-      font-size: 18px;
-      font-weight: 700;
-      line-height: 1.2;
       color: var(--accent);
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1.05;
     }
     .summary-pill-detail {
       color: var(--muted);
       font-size: 11px;
       line-height: 1.35;
-      margin-top: 4px;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.75fr) minmax(380px, 0.95fr);
+      gap: 12px;
+      align-items: start;
+    }
+    .main-stack,
+    .side-stack,
+    .overview-stack {
+      display: grid;
+      gap: 12px;
+    }
+    .toolbar-strip {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+    .toolbar-grow {
+      flex: 1 1 220px;
     }
     .badge {
       display: inline-flex;
-      border-radius: 999px;
-      padding: 4px 8px;
-      border: 1px solid var(--line-strong);
-      background: rgba(255, 155, 47, 0.08);
-      font-size: 11px;
-      font-weight: 700;
-      gap: 6px;
       align-items: center;
+      gap: 6px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      border: 1px solid var(--line-strong);
+      background: rgba(255, 154, 47, 0.08);
+      font-size: 10px;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
     }
     .badge.good { color: var(--good); background: var(--good-soft); }
     .badge.warn { color: var(--warn); background: var(--warn-soft); }
@@ -307,26 +307,24 @@ function renderAdminPage(options: {
     .danger { color: var(--danger); }
     .actions {
       display: flex;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
       align-items: center;
     }
     button {
       border: 0;
-      border-radius: 8px;
+      border-radius: 12px;
       background: var(--accent);
-      color: #190b00;
-      padding: 8px 11px;
+      color: #130800;
+      padding: 10px 14px;
       font: inherit;
-      font-weight: 700;
+      font-weight: 800;
       cursor: pointer;
-      transition: transform 120ms ease, opacity 120ms ease;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
+      transition: transform 120ms ease, opacity 120ms ease, background 120ms ease;
     }
-    button:hover {
-      transform: translateY(-1px);
-    }
+    button:hover { transform: translateY(-1px); }
     button:disabled {
       opacity: 0.55;
       cursor: default;
@@ -337,20 +335,20 @@ function renderAdminPage(options: {
       color: var(--text);
       border: 1px solid var(--line);
     }
-    input[type="password"], input[type="file"], textarea {
+    input[type="password"], input[type="search"], input[type="file"], select, textarea {
       width: 100%;
       box-sizing: border-box;
-      border-radius: 8px;
+      border-radius: 12px;
       border: 1px solid var(--line);
       background: var(--panel-strong);
       color: var(--text);
-      padding: 8px 10px;
+      padding: 10px 12px;
       font: inherit;
     }
     textarea {
       min-height: 180px;
       resize: vertical;
-      line-height: 1.4;
+      line-height: 1.45;
       font-family: var(--mono);
       font-size: 12px;
     }
@@ -358,43 +356,38 @@ function renderAdminPage(options: {
       display: grid;
       gap: 6px;
       color: var(--muted);
-      font-size: 14px;
+      font-size: 13px;
     }
-    .form-grid {
-      display: grid;
-      gap: 12px;
-      margin-top: 16px;
-    }
-    .stack {
-      display: grid;
-      gap: 12px;
-    }
-    .checkbox {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      color: var(--text);
-    }
-    .list {
+    .stack,
+    .list,
+    .log-list {
       display: grid;
       gap: 10px;
-      margin-top: 10px;
     }
-    .item {
+    .item,
+    .compact-stat,
+    .log-entry,
+    .subpanel {
       border: 1px solid var(--line);
-      border-radius: 10px;
+      border-radius: 12px;
       padding: 10px 12px;
       background: rgba(255,255,255,0.015);
     }
-    .item-head {
+    .item-head,
+    .section-head,
+    .subpanel-head {
       display: flex;
       justify-content: space-between;
       gap: 12px;
-      margin-bottom: 8px;
       align-items: center;
     }
-    .item-title {
-      font-weight: 650;
+    .section-head {
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    .item-title,
+    .subpanel-title {
+      font-weight: 700;
       word-break: break-word;
     }
     .item-text {
@@ -402,146 +395,83 @@ function renderAdminPage(options: {
       line-height: 1.55;
       word-break: break-word;
     }
-    .meta {
+    .meta,
+    .auth-file-meta {
       display: flex;
-      gap: 12px;
       flex-wrap: wrap;
-      color: var(--muted);
-      font-size: 13px;
-    }
-    .inline-grid {
-      display: grid;
-      gap: 10px;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .triple-grid {
-      display: grid;
-      gap: 12px;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-    .kv {
-      display: grid;
-      grid-template-columns: 180px 1fr;
       gap: 8px 12px;
-      margin-top: 14px;
-    }
-    .kv dt {
       color: var(--muted);
-    }
-    .kv dd {
-      margin: 0;
-      word-break: break-word;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 8px;
       font-size: 12px;
     }
-    th, td {
-      text-align: left;
-      padding: 10px 8px;
-      border-bottom: 1px solid var(--line);
-      vertical-align: top;
+    .compact-kv {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
     }
-    th {
+    .compact-stat-label {
+      margin-bottom: 4px;
       color: var(--muted);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
       font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
     }
-    pre {
-      margin: 0;
-      padding: 10px;
-      border-radius: 10px;
-      background: #050505;
-      overflow: auto;
-      border: 1px solid var(--line);
-      font-family: var(--mono);
+    .compact-stat-value {
+      font-size: 14px;
+      font-weight: 700;
+      word-break: break-word;
+    }
+    .status-line {
+      min-height: 18px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .hint {
+      color: var(--muted);
       font-size: 12px;
       line-height: 1.45;
     }
-    .status-line {
-      min-height: 22px;
-      color: var(--muted);
-    }
-    .section-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 10px;
-    }
-    .hint {
-      margin-top: 8px;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.55;
-    }
     .empty {
       padding: 12px;
-      border-radius: 10px;
       border: 1px dashed var(--line-strong);
+      border-radius: 12px;
       color: var(--muted);
       background: rgba(255,255,255,0.01);
     }
-    .log-list {
-      display: grid;
-      gap: 8px;
-      margin-top: 10px;
-    }
-    .log-entry {
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 8px 10px;
-      background: rgba(255,255,255,0.012);
-    }
     .log-entry.warn {
-      border-color: rgba(251, 191, 36, 0.28);
+      border-color: rgba(255, 203, 99, 0.28);
       background: var(--warn-soft);
     }
     .log-entry.error {
-      border-color: rgba(251, 113, 133, 0.34);
+      border-color: rgba(255, 116, 88, 0.36);
       background: var(--danger-soft);
     }
     .tiny {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--muted);
-    }
-    .action-card {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 8px 10px;
-      border-radius: 10px;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.012);
     }
     .session-shell {
       border: 1px solid var(--line);
-      border-radius: 10px;
+      border-radius: 12px;
       background: rgba(255,255,255,0.01);
       overflow: hidden;
     }
     .session-shell[open] {
       border-color: var(--line-strong);
-      background: rgba(255, 155, 47, 0.04);
+      background: rgba(255, 154, 47, 0.04);
     }
     .session-summary {
       list-style: none;
       cursor: pointer;
       display: grid;
       gap: 6px;
-      padding: 8px 10px;
+      padding: 10px 12px;
     }
     .session-summary::-webkit-details-marker {
       display: none;
     }
     .session-summary-top {
       display: grid;
-      grid-template-columns: minmax(220px, 2.2fr) minmax(140px, .95fr) minmax(150px, 1fr) minmax(140px, .95fr) minmax(220px, 1.8fr);
+      grid-template-columns: minmax(260px, 2.6fr) minmax(160px, 1fr) minmax(180px, 1.1fr) minmax(200px, 1.1fr) minmax(180px, 1fr);
       gap: 6px;
       align-items: start;
     }
@@ -566,6 +496,7 @@ function renderAdminPage(options: {
       display: grid;
       gap: 6px;
       align-content: start;
+      justify-items: end;
     }
     .session-counts {
       display: flex;
@@ -584,7 +515,7 @@ function renderAdminPage(options: {
     dialog.admin-modal {
       border: 0;
       padding: 0;
-      border-radius: 24px;
+      border-radius: 18px;
       width: min(760px, calc(100vw - 24px));
       background: transparent;
       color: inherit;
@@ -596,7 +527,7 @@ function renderAdminPage(options: {
     .modal-card {
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 14px;
+      border-radius: 16px;
       padding: 16px;
       box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
       display: grid;
@@ -646,15 +577,6 @@ function renderAdminPage(options: {
       flex-wrap: wrap;
       align-items: center;
     }
-    .session-toolbar input,
-    .session-toolbar select {
-      border-radius: 10px;
-      border: 1px solid var(--line);
-      background: var(--panel-strong);
-      color: var(--text);
-      padding: 8px 10px;
-      font: inherit;
-    }
     .session-toolbar input {
       min-width: 240px;
       flex: 1 1 280px;
@@ -695,10 +617,10 @@ function renderAdminPage(options: {
     }
     .dense-table th {
       color: var(--muted);
-      font-size: 11px;
-      font-weight: 600;
+      font-size: 10px;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.08em;
     }
     .dense-table td code,
     .dense-table td .mono {
@@ -709,51 +631,27 @@ function renderAdminPage(options: {
       grid-template-columns: 1.3fr 1fr;
       gap: 12px;
     }
-    .subpanel {
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 12px;
-      background: rgba(255,255,255,0.01);
-      display: grid;
-      gap: 10px;
-    }
-    .subpanel-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      align-items: baseline;
-    }
-    .subpanel-title {
-      font-size: 13px;
-      font-weight: 650;
-    }
     .subpanel-meta {
       color: var(--muted);
       font-size: 11px;
     }
-    .dense-panels {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(360px, 1.15fr);
-      gap: 14px;
-      align-items: start;
-    }
     .auth-file-list {
       display: grid;
-      gap: 10px;
+      gap: 8px;
     }
     .auth-file-row {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       gap: 12px;
-      align-items: start;
+      align-items: center;
       border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 12px;
+      border-radius: 12px;
+      padding: 10px 12px;
       background: rgba(255,255,255,0.012);
     }
     .auth-file-main {
       display: grid;
-      gap: 8px;
+      gap: 6px;
       min-width: 0;
     }
     .auth-file-title-group {
@@ -767,11 +665,11 @@ function renderAdminPage(options: {
       display: flex;
       justify-content: space-between;
       gap: 8px;
-      align-items: start;
+      align-items: center;
     }
     .auth-file-title {
       font-size: 13px;
-      font-weight: 650;
+      font-weight: 700;
     }
     .auth-file-tag {
       display: inline-flex;
@@ -786,39 +684,23 @@ function renderAdminPage(options: {
       text-transform: uppercase;
       letter-spacing: 0.06em;
     }
-    .auth-file-copy {
-      font-size: 11px;
-      color: var(--muted);
-      line-height: 1.35;
-    }
-    .auth-file-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px 12px;
-      color: var(--muted);
-      font-size: 12px;
-    }
     .auth-file-path {
-      font-size: 12px;
+      font-size: 11px;
       line-height: 1.35;
       color: var(--muted);
       word-break: break-word;
     }
     .auth-file-actions {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: flex-end;
-      padding-top: 2px;
     }
     .auth-file-actions button {
       min-width: 88px;
-      padding: 7px 12px;
+      padding: 8px 12px;
       font-size: 12px;
     }
     @media (max-width: 960px) {
-      .span-4, .span-5, .span-6, .span-7, .span-8, .span-12 {
-        grid-column: span 12;
-      }
       .headerbar {
         flex-direction: column;
         align-items: stretch;
@@ -826,25 +708,16 @@ function renderAdminPage(options: {
       .summary-strip {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
-      .inline-grid {
-        grid-template-columns: 1fr;
-      }
-      .triple-grid {
+      .layout {
         grid-template-columns: 1fr;
       }
       .compact-kv {
-        grid-template-columns: 1fr;
-      }
-      .kv {
         grid-template-columns: 1fr;
       }
       .session-summary-top {
         grid-template-columns: 1fr;
       }
       .session-detail-grid {
-        grid-template-columns: 1fr;
-      }
-      .dense-panels {
         grid-template-columns: 1fr;
       }
       .auth-file-row {
@@ -902,107 +775,130 @@ function renderAdminPage(options: {
         </div>
       </section>
 
-      <div class="grid">
-      <section class="card span-12">
-        <div class="section-head">
-          <h2>运行概览</h2>
-          <div class="actions">
-            <input id="token-input" type="password" placeholder="${options.tokenConfigured ? "管理员令牌" : "当前可留空"}" style="width:220px" />
-            <button id="refresh-button" class="secondary">刷新</button>
-            <span class="tiny" id="last-refresh">还没有刷新</span>
-          </div>
-        </div>
-        <div class="status-line" id="token-status"></div>
-        <div class="dense-panels" style="margin-top:8px;">
-          <div class="subpanel">
-            <div class="subpanel-head"><div class="subpanel-title">服务</div></div>
-            <div id="service-card"></div>
-          </div>
-          <div class="subpanel">
-            <div class="subpanel-head"><div class="subpanel-title">账号</div></div>
-            <div id="account-card"></div>
-          </div>
-          <div class="subpanel">
-            <div class="subpanel-head"><div class="subpanel-title">登录文件</div></div>
-            <div class="auth-file-list">
-              <div class="auth-file-row">
-                <div class="auth-file-main">
-                  <div class="auth-file-head">
-                    <div class="auth-file-title-group">
-                      <div class="auth-file-title mono">auth.json</div>
-                      <div class="auth-file-tag">常用</div>
-                    </div>
-                    <div id="auth-file-auth-badge"></div>
-                  </div>
-                  <div class="auth-file-meta" id="auth-file-auth-meta"></div>
-                  <div class="auth-file-path mono" id="auth-file-auth-path"></div>
-                </div>
-                <div class="auth-file-actions">
-                  <button id="open-auth-dialog">替换</button>
-                </div>
-              </div>
-              <div class="auth-file-row">
-                <div class="auth-file-main">
-                  <div class="auth-file-head">
-                    <div class="auth-file-title-group">
-                      <div class="auth-file-title mono">.credentials.json</div>
-                      <div class="auth-file-tag">MCP</div>
-                    </div>
-                    <div id="auth-file-credentials-badge"></div>
-                  </div>
-                  <div class="auth-file-meta" id="auth-file-credentials-meta"></div>
-                  <div class="auth-file-path mono" id="auth-file-credentials-path"></div>
-                </div>
-                <div class="auth-file-actions">
-                  <button id="open-credentials-dialog" class="secondary">替换</button>
-                </div>
-              </div>
-              <div class="auth-file-row">
-                <div class="auth-file-main">
-                  <div class="auth-file-head">
-                    <div class="auth-file-title-group">
-                      <div class="auth-file-title mono">config.toml</div>
-                      <div class="auth-file-tag">配置</div>
-                    </div>
-                    <div id="auth-file-config-badge"></div>
-                  </div>
-                  <div class="auth-file-meta" id="auth-file-config-meta"></div>
-                  <div class="auth-file-path mono" id="auth-file-config-path"></div>
-                </div>
-                <div class="auth-file-actions">
-                  <button id="open-config-dialog" class="secondary">替换</button>
-                </div>
+      <div class="layout">
+        <div class="main-stack">
+          <section class="card">
+            <div class="section-head">
+              <h2>会话状态</h2>
+              <div class="session-toolbar">
+                <input id="session-search" type="search" placeholder="搜索 session key / channel / workspace / snippet" />
+                <select id="session-filter">
+                  <option value="all">全部</option>
+                  <option value="active">只看 active</option>
+                  <option value="inbound">只看有待处理消息</option>
+                  <option value="jobs">只看有运行中任务</option>
+                  <option value="issues">只看有失败任务</option>
+                </select>
               </div>
             </div>
-            <div class="hint">替换前会先备份旧文件，然后重启内置 runtime。</div>
-            <div class="status-line" id="replace-status"></div>
-          </div>
-        </div>
-      </section>
+            <div id="sessions-panel" class="list"></div>
+          </section>
 
-      <section class="card span-12">
-        <div class="section-head">
-          <h2>会话状态</h2>
-          <div class="session-toolbar">
-            <input id="session-search" type="search" placeholder="搜索 session key / channel / workspace / snippet" />
-            <select id="session-filter">
-              <option value="all">全部</option>
-              <option value="active">只看 active</option>
-              <option value="inbound">只看有待处理消息</option>
-              <option value="jobs">只看有运行中任务</option>
-              <option value="issues">只看有失败任务</option>
-            </select>
-          </div>
+          <section class="card">
+            <div class="section-head">
+              <h2>最近日志</h2>
+              <div class="tiny mono">broker / recovery / turn</div>
+            </div>
+            <div id="logs-panel" class="log-list"></div>
+          </section>
         </div>
-        <div id="sessions-panel" class="list"></div>
-      </section>
 
-      <section class="card span-12">
-        <div class="section-head">
-          <h2>最近日志</h2>
-        </div>
-        <div id="logs-panel" class="log-list"></div>
-      </section>
+        <aside class="side-stack">
+          <section class="card">
+            <div class="section-head">
+              <h2>运行概览</h2>
+              <div class="toolbar-strip">
+                <input
+                  id="token-input"
+                  class="toolbar-grow"
+                  type="password"
+                  placeholder="${options.tokenConfigured ? "管理员令牌" : "当前可留空"}"
+                />
+                <button id="refresh-button" class="secondary">刷新</button>
+              </div>
+            </div>
+            <div class="status-line" id="token-status"></div>
+            <div class="tiny" id="last-refresh">还没有刷新</div>
+          </section>
+
+          <div class="overview-stack">
+            <section class="subpanel">
+              <div class="subpanel-head">
+                <div class="subpanel-title">服务</div>
+                <div class="tiny mono">runtime</div>
+              </div>
+              <div id="service-card"></div>
+            </section>
+
+            <section class="subpanel">
+              <div class="subpanel-head">
+                <div class="subpanel-title">账号</div>
+                <div class="tiny mono">account</div>
+              </div>
+              <div id="account-card"></div>
+            </section>
+
+            <section class="subpanel">
+              <div class="subpanel-head">
+                <div class="subpanel-title">登录文件</div>
+                <div class="tiny mono">auth / mcp / config</div>
+              </div>
+              <div class="auth-file-list">
+                <div class="auth-file-row">
+                  <div class="auth-file-main">
+                    <div class="auth-file-head">
+                      <div class="auth-file-title-group">
+                        <div class="auth-file-title mono">auth.json</div>
+                        <div class="auth-file-tag">常用</div>
+                      </div>
+                      <div id="auth-file-auth-badge"></div>
+                    </div>
+                    <div class="auth-file-meta" id="auth-file-auth-meta"></div>
+                    <div class="auth-file-path mono" id="auth-file-auth-path"></div>
+                  </div>
+                  <div class="auth-file-actions">
+                    <button id="open-auth-dialog">替换</button>
+                  </div>
+                </div>
+
+                <div class="auth-file-row">
+                  <div class="auth-file-main">
+                    <div class="auth-file-head">
+                      <div class="auth-file-title-group">
+                        <div class="auth-file-title mono">.credentials.json</div>
+                        <div class="auth-file-tag">MCP</div>
+                      </div>
+                      <div id="auth-file-credentials-badge"></div>
+                    </div>
+                    <div class="auth-file-meta" id="auth-file-credentials-meta"></div>
+                    <div class="auth-file-path mono" id="auth-file-credentials-path"></div>
+                  </div>
+                  <div class="auth-file-actions">
+                    <button id="open-credentials-dialog" class="secondary">替换</button>
+                  </div>
+                </div>
+
+                <div class="auth-file-row">
+                  <div class="auth-file-main">
+                    <div class="auth-file-head">
+                      <div class="auth-file-title-group">
+                        <div class="auth-file-title mono">config.toml</div>
+                        <div class="auth-file-tag">配置</div>
+                      </div>
+                      <div id="auth-file-config-badge"></div>
+                    </div>
+                    <div class="auth-file-meta" id="auth-file-config-meta"></div>
+                    <div class="auth-file-path mono" id="auth-file-config-path"></div>
+                  </div>
+                  <div class="auth-file-actions">
+                    <button id="open-config-dialog" class="secondary">替换</button>
+                  </div>
+                </div>
+              </div>
+              <div class="status-line" id="replace-status"></div>
+            </section>
+          </div>
+        </aside>
       </div>
     </div>
   </div>
