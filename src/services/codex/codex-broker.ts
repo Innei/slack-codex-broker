@@ -23,7 +23,9 @@ export class CodexBroker {
   readonly #reposRoot: string;
   #slackBotIdentity: SlackUserIdentity | null = null;
   #reconnectPromise: Promise<void> | undefined;
+  #connectQueue: Promise<void> = Promise.resolve();
   #stopping = false;
+  readonly #ignoredDisconnectClients = new WeakSet<AppServerClient>();
 
   constructor(options: {
     readonly serviceName: string;
@@ -68,7 +70,7 @@ export class CodexBroker {
 
   async start(): Promise<void> {
     this.#stopping = false;
-    await this.#connectClient({
+    await this.#queueConnectClient({
       restartProcess: true
     });
   }
@@ -143,7 +145,7 @@ export class CodexBroker {
   }
 
   async restartRuntime(reason = "admin runtime restart"): Promise<void> {
-    await this.#connectClient({
+    await this.#queueConnectClient({
       restartProcess: true,
       reason
     });
@@ -164,6 +166,10 @@ export class CodexBroker {
 
   #bindClient(client: AppServerClient): void {
     client.on("disconnected", (error) => {
+      if (this.#ignoredDisconnectClients.has(client)) {
+        return;
+      }
+
       if (client !== this.#client) {
         return;
       }
@@ -211,7 +217,7 @@ export class CodexBroker {
       });
       this.#reconnectPromise = (async () => {
         try {
-          await this.#connectClient({
+          await this.#queueConnectClient({
             restartProcess: false,
             reason: error.message
           });
@@ -221,7 +227,7 @@ export class CodexBroker {
             reconnectError:
               reconnectError instanceof Error ? reconnectError.message : String(reconnectError)
           });
-          await this.#connectClient({
+          await this.#queueConnectClient({
             restartProcess: true,
             reason: error.message
           });
@@ -234,7 +240,20 @@ export class CodexBroker {
     await this.#reconnectPromise;
   }
 
-  async #connectClient(options: {
+  async #queueConnectClient(options: {
+    readonly restartProcess: boolean;
+    readonly reason?: string | undefined;
+  }): Promise<void> {
+    const run = this.#connectQueue
+      .catch(() => {})
+      .then(async () => {
+        await this.#performConnectClient(options);
+      });
+    this.#connectQueue = run.catch(() => {});
+    await run;
+  }
+
+  async #performConnectClient(options: {
     readonly restartProcess: boolean;
     readonly reason?: string | undefined;
   }): Promise<void> {
@@ -243,6 +262,8 @@ export class CodexBroker {
       restartProcess: options.restartProcess,
       reason: options.reason ?? null
     });
+
+    await this.#retireCurrentClient();
 
     if (options.restartProcess) {
       if (this.#appServerProcess) {
@@ -260,6 +281,22 @@ export class CodexBroker {
     logger.info("Codex app-server client connected", {
       url: this.#appServerProcess?.url ?? this.#codexAppServerUrl ?? null
     });
+  }
+
+  async #retireCurrentClient(): Promise<void> {
+    const previousClient = this.#client;
+    if (!previousClient) {
+      return;
+    }
+
+    this.#ignoredDisconnectClients.add(previousClient);
+    try {
+      await previousClient.close();
+    } catch (error) {
+      logger.warn("Failed to close previous Codex app-server client during reconnect", {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
   }
 }
 

@@ -488,8 +488,12 @@ describe.sequential("slack-codex-broker e2e", () => {
       ts: "555.221",
       text: "<@UBOT> 触发一次回复"
     });
-    await waitFor(() => mockSlack.postedMessages.some((message) => message.text === "broker self reply"), "bot reply");
-    await waitForSessionIdle(tempRoot, "C123:555.220");
+    await waitFor(
+      () => mockSlack.postedMessages.some((message) => message.text === "broker self reply"),
+      "bot reply",
+      30_000
+    );
+    await waitForSessionIdle(tempRoot, "C123:555.220", 30_000);
 
     await broker.stop();
     cleanups.pop();

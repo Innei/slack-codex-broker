@@ -17,6 +17,7 @@ export class AppServerProcess {
   readonly #hostCodexHomePath: string | undefined;
   readonly #disabledMcpServers: string[];
   #child: ChildProcessByStdio<null, Readable, Readable> | undefined;
+  #homePrepared = false;
 
   constructor(options: {
     readonly codexHome: string;
@@ -44,16 +45,7 @@ export class AppServerProcess {
       return;
     }
 
-    await ensureDir(this.#codexHome);
-    await syncUserCodexHome({
-      codexHome: this.#codexHome,
-      hostCodexHomePath: this.#hostCodexHomePath,
-      runtimeHomePath: this.#runtimeHome,
-      legacyPersonalMemoryPath:
-        path.resolve(this.#runtimeHome) === path.resolve(os.homedir())
-          ? undefined
-          : path.join(os.homedir(), ".codex", "AGENT.md")
-    });
+    await this.#prepareCodexHome();
     await this.#bootstrapAuth();
     await this.#disableConfiguredMcpServers();
 
@@ -68,6 +60,7 @@ export class AppServerProcess {
     }
 
     this.#child = spawn("codex", ["app-server", "--listen", this.url], {
+      detached: true,
       env,
       stdio: ["ignore", "pipe", "pipe"]
     });
@@ -135,20 +128,38 @@ export class AppServerProcess {
       return;
     }
 
-    child.kill("SIGTERM");
+    killChildProcessGroup(child, "SIGTERM");
     const exitedOnSigterm = await waitForChildExit(child, 5_000);
     if (exitedOnSigterm) {
       return;
     }
 
     logger.warn("codex app-server did not exit after SIGTERM; sending SIGKILL");
-    child.kill("SIGKILL");
+    killChildProcessGroup(child, "SIGKILL");
     const exitedOnSigkill = await waitForChildExit(child, 2_000);
     if (exitedOnSigkill) {
       return;
     }
 
     logger.warn("codex app-server did not exit after SIGKILL timeout");
+  }
+
+  async #prepareCodexHome(): Promise<void> {
+    if (this.#homePrepared) {
+      return;
+    }
+
+    await ensureDir(this.#codexHome);
+    await syncUserCodexHome({
+      codexHome: this.#codexHome,
+      hostCodexHomePath: this.#hostCodexHomePath,
+      runtimeHomePath: this.#runtimeHome,
+      legacyPersonalMemoryPath:
+        path.resolve(this.#runtimeHome) === path.resolve(os.homedir())
+          ? undefined
+          : path.join(os.homedir(), ".codex", "AGENT.md")
+    });
+    this.#homePrepared = true;
   }
 
   async #bootstrapAuth(): Promise<void> {
@@ -262,6 +273,25 @@ export class AppServerProcess {
         reject(new Error(`codex ${args.join(" ")} failed with code ${code ?? "null"}: ${stderr || stdout}`));
       });
     });
+  }
+}
+
+function killChildProcessGroup(
+  child: ChildProcessByStdio<null, Readable, Readable>,
+  signal: NodeJS.Signals
+): void {
+  if (typeof child.pid !== "number") {
+    return;
+  }
+
+  try {
+    process.kill(-child.pid, signal);
+  } catch {
+    try {
+      child.kill(signal);
+    } catch {
+      // ignore best-effort shutdown failures here; callers already handle timeouts
+    }
   }
 }
 
