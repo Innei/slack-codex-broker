@@ -31,7 +31,7 @@ describe.sequential("slack-codex-broker e2e", () => {
   it("starts a new session, backfills history, and forwards full Slack card payloads", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-broker-e2e-"));
     cleanups.push(async () => {
-      await fs.rm(tempRoot, { force: true, recursive: true });
+      await removeTempRoot(tempRoot);
     });
 
     const mockSlack = new MockSlackServer("UBOT", {
@@ -132,7 +132,7 @@ describe.sequential("slack-codex-broker e2e", () => {
   it("replays missed thread messages after restart as a single recovered batch", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-broker-e2e-"));
     cleanups.push(async () => {
-      await fs.rm(tempRoot, { force: true, recursive: true });
+      await removeTempRoot(tempRoot);
     });
 
     const mockSlack = new MockSlackServer("UBOT", {
@@ -213,7 +213,7 @@ describe.sequential("slack-codex-broker e2e", () => {
   it("recovers persisted pending backlog on startup when a session has no active turn", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-broker-e2e-"));
     cleanups.push(async () => {
-      await fs.rm(tempRoot, { force: true, recursive: true });
+      await removeTempRoot(tempRoot);
     });
 
     const mockSlack = new MockSlackServer("UBOT", {
@@ -303,7 +303,7 @@ describe.sequential("slack-codex-broker e2e", () => {
   it("injects background job events back into the same session", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-broker-e2e-"));
     cleanups.push(async () => {
-      await fs.rm(tempRoot, { force: true, recursive: true });
+      await removeTempRoot(tempRoot);
     });
 
     const mockSlack = new MockSlackServer("UBOT", {
@@ -385,7 +385,7 @@ describe.sequential("slack-codex-broker e2e", () => {
   it("nudges long-running turns to consider a Slack progress update", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-broker-e2e-"));
     cleanups.push(async () => {
-      await fs.rm(tempRoot, { force: true, recursive: true });
+      await removeTempRoot(tempRoot);
     });
 
     const mockSlack = new MockSlackServer("UBOT", {
@@ -447,7 +447,7 @@ describe.sequential("slack-codex-broker e2e", () => {
   it("does not recover the broker's own Slack messages as inbound work", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-broker-e2e-"));
     cleanups.push(async () => {
-      await fs.rm(tempRoot, { force: true, recursive: true });
+      await removeTempRoot(tempRoot);
     });
 
     const brokerPort = await getFreePort();
@@ -641,6 +641,21 @@ async function waitForSessionIdle(
 
 async function delay(timeoutMs: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, timeoutMs));
+}
+
+async function removeTempRoot(tempRoot: string): Promise<void> {
+  let lastError: unknown = undefined;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await fs.rm(tempRoot, { force: true, recursive: true });
+      return;
+    } catch (error) {
+      lastError = error;
+      await delay(100 * (attempt + 1));
+    }
+  }
+
+  throw lastError;
 }
 
 async function getFreePort(): Promise<number> {

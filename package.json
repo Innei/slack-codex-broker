@@ -19,6 +19,8 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/index.ts",
     "ops:check:real": "node scripts/ops/check-real.mjs",
+    "ops:auth:real": "node scripts/ops/auth-real.mjs",
+    "ops:ui:real": "node scripts/ops/auth-ui-real.mjs",
     "ops:rollout:real": "node scripts/ops/rollout-real.mjs",
     "ops:resume:real": "node scripts/ops/resume-real.mjs",
     "ops:status:real": "node scripts/ops/status-real.mjs",
