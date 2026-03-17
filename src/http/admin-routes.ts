@@ -1290,7 +1290,7 @@ function renderAdminPage(options: {
           summarizeSessionLead(session),
           ...(session.openInbound || []).map((item) => item.textPreview || ""),
           ...(session.backgroundJobs || []).map((job) => [job.kind, job.cwd, job.error].filter(Boolean).join(" "))
-        ].join("\n").toLowerCase();
+        ].join("\\n").toLowerCase();
         return haystack.includes(needle);
       });
       const parts = [];
