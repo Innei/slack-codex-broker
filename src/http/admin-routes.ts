@@ -154,7 +154,7 @@ function renderAdminPage(options: {
     .wrap {
       max-width: 1440px;
       margin: 0 auto;
-      padding: 28px;
+      padding: 20px;
     }
     .topbar {
       display: flex;
@@ -188,13 +188,13 @@ function renderAdminPage(options: {
     .grid {
       display: grid;
       grid-template-columns: repeat(12, minmax(0, 1fr));
-      gap: 18px;
+      gap: 14px;
     }
     .card {
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 22px;
-      padding: 20px;
+      border-radius: 18px;
+      padding: 16px;
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.24);
       backdrop-filter: blur(12px);
     }
@@ -226,30 +226,30 @@ function renderAdminPage(options: {
     .summary-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 18px;
-      margin-bottom: 18px;
+      gap: 12px;
+      margin-bottom: 14px;
     }
     .summary-card {
       background: var(--panel-soft);
       border: 1px solid var(--line);
-      border-radius: 18px;
-      padding: 18px;
-      min-height: 120px;
+      border-radius: 16px;
+      padding: 14px;
+      min-height: 96px;
     }
     .summary-kicker {
       color: var(--muted);
-      font-size: 13px;
-      margin-bottom: 14px;
+      font-size: 12px;
+      margin-bottom: 10px;
     }
     .summary-value {
-      font-size: 34px;
+      font-size: 28px;
       font-weight: 700;
       letter-spacing: -0.03em;
-      margin-bottom: 10px;
+      margin-bottom: 6px;
     }
     .summary-detail {
       color: var(--muted);
-      font-size: 13px;
+      font-size: 12px;
       line-height: 1.5;
     }
     .badge {
@@ -341,13 +341,13 @@ function renderAdminPage(options: {
     }
     .list {
       display: grid;
-      gap: 10px;
-      margin-top: 14px;
+      gap: 8px;
+      margin-top: 10px;
     }
     .item {
       border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 14px;
+      border-radius: 12px;
+      padding: 10px 12px;
       background: rgba(255,255,255,0.025);
     }
     .item-head {
@@ -454,13 +454,13 @@ function renderAdminPage(options: {
     }
     .log-list {
       display: grid;
-      gap: 10px;
-      margin-top: 12px;
+      gap: 8px;
+      margin-top: 10px;
     }
     .log-entry {
       border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 14px;
+      border-radius: 12px;
+      padding: 10px 12px;
       background: rgba(255,255,255,0.02);
     }
     .log-entry.warn {
@@ -478,8 +478,8 @@ function renderAdminPage(options: {
     .action-card {
       display: grid;
       gap: 12px;
-      padding: 18px;
-      border-radius: 18px;
+      padding: 14px;
+      border-radius: 14px;
       border: 1px solid var(--line);
       background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
     }
@@ -502,7 +502,7 @@ function renderAdminPage(options: {
     }
     .session-shell {
       border: 1px solid var(--line);
-      border-radius: 18px;
+      border-radius: 14px;
       background: rgba(255,255,255,0.025);
       overflow: hidden;
     }
@@ -514,21 +514,21 @@ function renderAdminPage(options: {
       list-style: none;
       cursor: pointer;
       display: grid;
-      gap: 12px;
-      padding: 16px 18px;
+      gap: 10px;
+      padding: 12px 14px;
     }
     .session-summary::-webkit-details-marker {
       display: none;
     }
     .session-summary-top {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: flex-start;
+      display: grid;
+      grid-template-columns: minmax(280px, 2fr) minmax(150px, 1fr) minmax(150px, 1fr) minmax(180px, 1.2fr) minmax(220px, 1.2fr);
+      gap: 10px;
+      align-items: start;
     }
     .session-summary-main {
       display: grid;
-      gap: 8px;
+      gap: 4px;
       min-width: 0;
     }
     .session-summary-title {
@@ -538,25 +538,24 @@ function renderAdminPage(options: {
     .session-summary-meta {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px 14px;
+      gap: 6px 10px;
       color: var(--muted);
-      font-size: 13px;
+      font-size: 12px;
     }
     .session-summary-side {
       display: grid;
-      gap: 8px;
-      justify-items: end;
-      text-align: right;
+      gap: 6px;
+      align-content: start;
     }
     .session-counts {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 6px;
     }
     .session-body {
-      padding: 0 18px 18px;
+      padding: 0 14px 14px;
       display: grid;
-      gap: 12px;
+      gap: 10px;
     }
     .session-divider {
       height: 1px;
@@ -600,6 +599,117 @@ function renderAdminPage(options: {
       gap: 10px;
       flex-wrap: wrap;
     }
+    .compact-kv {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .compact-stat {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.025);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+    .compact-stat-label {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .compact-stat-value {
+      font-size: 14px;
+      font-weight: 650;
+      word-break: break-word;
+    }
+    .session-toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .session-toolbar input,
+    .session-toolbar select {
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel-strong);
+      color: var(--text);
+      padding: 8px 10px;
+      font: inherit;
+    }
+    .session-toolbar input {
+      min-width: 240px;
+      flex: 1 1 280px;
+    }
+    .session-summary-cell {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+    .session-summary-label {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .session-summary-value {
+      font-size: 13px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .session-summary-value.truncate {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .dense-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0;
+      font-size: 12px;
+    }
+    .dense-table th,
+    .dense-table td {
+      padding: 8px 6px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    .dense-table th {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .dense-table td code,
+    .dense-table td .mono {
+      font-size: 11px;
+    }
+    .session-detail-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 10px;
+    }
+    .subpanel {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.02);
+    }
+    .subpanel-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+    .subpanel-title {
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .subpanel-meta {
+      color: var(--muted);
+      font-size: 11px;
+    }
     @media (max-width: 960px) {
       .span-4, .span-5, .span-6, .span-7, .span-8, .span-12 {
         grid-column: span 12;
@@ -616,7 +726,16 @@ function renderAdminPage(options: {
       .triple-grid {
         grid-template-columns: 1fr;
       }
+      .compact-kv {
+        grid-template-columns: 1fr;
+      }
       .kv {
+        grid-template-columns: 1fr;
+      }
+      .session-summary-top {
+        grid-template-columns: 1fr;
+      }
+      .session-detail-grid {
         grid-template-columns: 1fr;
       }
     }
@@ -776,7 +895,17 @@ function renderAdminPage(options: {
         <div class="section-head">
           <div>
             <h2>会话状态</h2>
-            <div class="section-copy">每条 session 先给你一个紧凑摘要：当前是否在跑、还挂着多少待处理消息、后台任务是运行中多少个 / 总共多少个。点开再看细节。</div>
+            <div class="section-copy">这里改成高密度视图：先筛选，再扫摘要行，最后按需展开看消息和任务。</div>
+          </div>
+          <div class="session-toolbar">
+            <input id="session-search" type="search" placeholder="搜索 session key / channel / workspace / snippet" />
+            <select id="session-filter">
+              <option value="all">全部</option>
+              <option value="active">只看 active</option>
+              <option value="inbound">只看有待处理消息</option>
+              <option value="jobs">只看有运行中任务</option>
+              <option value="issues">只看有失败任务</option>
+            </select>
           </div>
         </div>
         <div id="sessions-panel" class="list"></div>
@@ -892,9 +1021,12 @@ function renderAdminPage(options: {
     const refreshButton = document.getElementById("refresh-button");
     const replaceStatus = document.getElementById("replace-status");
     const lastRefresh = document.getElementById("last-refresh");
+    const sessionSearch = document.getElementById("session-search");
+    const sessionFilter = document.getElementById("session-filter");
     const authJsonText = document.getElementById("auth-json-text");
     const credentialsJsonText = document.getElementById("credentials-json-text");
     const configTomlText = document.getElementById("config-toml-text");
+    let latestStatus = null;
     const dialogs = [
       ["auth-dialog", "open-auth-dialog", "close-auth-dialog"],
       ["credentials-dialog", "open-credentials-dialog", "close-credentials-dialog"],
@@ -990,26 +1122,38 @@ function renderAdminPage(options: {
       document.getElementById("summary-sessions").textContent =
         String(state.activeCount || 0) + " / " + String(state.sessionCount || 0);
       document.getElementById("summary-sessions-detail").textContent =
-        "活跃会话 / 总会话。另有 " + String(state.openInboundCount || 0) + " 条待处理消息。";
+        "活跃 / 总会话，待处理 " + String(state.openInboundCount || 0) + "。";
 
       document.getElementById("summary-jobs").textContent = String(runningJobs);
       document.getElementById("summary-jobs-detail").textContent =
-        "正在运行的关联后台任务。失败 " + String(failedJobs) + " 个。";
+        "运行中任务，失败 " + String(failedJobs) + "。";
     }
 
     function renderService(data) {
       const card = document.getElementById("service-card");
       const service = data.service || {};
-      card.innerHTML = [
-        ["服务名", esc(service.name || "—")],
-        ["PID", esc(service.pid || "—")],
-        ["运行时长", esc(fmtDuration(service.uptimeSeconds || 0))],
-        ["启动时间", esc(fmtTime(service.startedAt))],
-        ["端口", esc(service.port || "—")],
-        ["会话目录", '<span class="mono">' + esc(service.sessionsRoot || "—") + "</span>"],
-        ["仓库目录", '<span class="mono">' + esc(service.reposRoot || "—") + "</span>"],
-        ["Codex Home", '<span class="mono">' + esc(service.codexHome || "—") + "</span>"]
-      ].map(([k, v]) => "<dt>" + k + "</dt><dd>" + v + "</dd>").join("");
+      card.innerHTML =
+        '<div class="compact-kv">' +
+          [
+            ["服务名", esc(service.name || "—")],
+            ["PID", esc(service.pid || "—")],
+            ["运行时长", esc(fmtDuration(service.uptimeSeconds || 0))],
+            ["端口", esc(service.port || "—")],
+            ["启动时间", esc(fmtTime(service.startedAt))],
+            ["管理员令牌", service.adminTokenConfigured ? "已配置" : "未配置"]
+          ].map(([k, v]) =>
+            '<div class="compact-stat"><div class="compact-stat-label">' + k + '</div><div class="compact-stat-value">' + v + "</div></div>"
+          ).join("") +
+        '</div>' +
+        '<div class="list">' +
+          [
+            ["会话目录", service.sessionsRoot || "—"],
+            ["仓库目录", service.reposRoot || "—"],
+            ["Codex Home", service.codexHome || "—"]
+          ].map(([k, v]) =>
+            '<div class="item"><div class="item-head"><div class="item-title">' + esc(k) + '</div></div><div class="hint mono">' + esc(v) + "</div></div>"
+          ).join("") +
+        '</div>';
     }
 
     function renderAccount(data) {
@@ -1022,7 +1166,16 @@ function renderAdminPage(options: {
 
       const summary = account.account || {};
       panel.innerHTML = [
-        '<div class="item"><div class="item-head"><div class="item-title">当前运行账号</div>' + renderBadge(summary.planType || "unknown", "good") + '</div><div class="meta"><span>类型：' + esc(summary.type || "—") + '</span><span>邮箱：' + esc(summary.email || "—") + "</span></div></div>",
+        '<div class="compact-kv">' +
+          [
+            ["套餐", summary.planType || "unknown"],
+            ["类型", summary.type || "—"],
+            ["邮箱", summary.email || "—"],
+            ["额度", account.quota ? "已提供" : "未提供"]
+          ].map(([k, v]) =>
+            '<div class="compact-stat"><div class="compact-stat-label">' + esc(k) + '</div><div class="compact-stat-value">' + esc(v) + "</div></div>"
+          ).join("") +
+        '</div>',
         account.quota
           ? '<pre>' + esc(JSON.stringify(account.quota, null, 2)) + "</pre>"
           : '<div class="item"><div class="item-title">额度信息</div><div class="item-text muted">' + esc(account.note || "当前接口没有返回 quota 或 usage 字段。") + "</div></div>"
@@ -1044,10 +1197,84 @@ function renderAdminPage(options: {
       }).join("");
     }
 
+    function summarizeSessionLead(session) {
+      const inbound = session.openInbound || [];
+      if (inbound.length > 0) {
+        return inbound.map((item) => item.textPreview).filter(Boolean)[0] || "有待处理消息";
+      }
+      const jobs = session.backgroundJobs || [];
+      if (jobs.length > 0) {
+        const running = jobs.find((job) => job.status === "running") || jobs[0];
+        return (running.kind || "job") + " · " + (running.status || "unknown");
+      }
+      return "当前无待处理项";
+    }
+
+    function renderDenseInboundTable(inbound) {
+      if (!inbound.length) {
+        return '<div class="empty">没有待处理消息。</div>';
+      }
+      return '<table class="dense-table"><thead><tr><th>状态</th><th>来源</th><th>消息</th><th>更新时间</th></tr></thead><tbody>' +
+        inbound.map((item) =>
+          '<tr>' +
+            '<td>' + renderBadge(item.status || "unknown", statusTone(item.status)) + '</td>' +
+            '<td><span class="mono">' + esc(item.source || "—") + '</span></td>' +
+            '<td>' +
+              '<div class="mono tiny">' + esc(item.messageTs || "—") + '</div>' +
+              '<div>' + esc(item.textPreview || "—") + '</div>' +
+            '</td>' +
+            '<td>' + esc(fmtTime(item.updatedAt)) + '</td>' +
+          '</tr>'
+        ).join("") +
+      "</tbody></table>";
+    }
+
+    function renderDenseJobsTable(jobs, totals) {
+      if (!jobs.length) {
+        return '<div class="empty">没有关联后台任务。</div>';
+      }
+      return '<table class="dense-table"><thead><tr><th>状态</th><th>类型</th><th>CWD</th><th>更新时间</th></tr></thead><tbody>' +
+        jobs.map((job) =>
+          '<tr>' +
+            '<td>' + renderBadge(job.status || "unknown", statusTone(job.status)) + '</td>' +
+            '<td><span class="mono">' + esc(job.kind || "—") + '</span></td>' +
+            '<td>' +
+              '<div class="mono">' + esc(job.cwd || "—") + '</div>' +
+              (job.error ? '<div class="danger tiny" style="margin-top:4px;">' + esc(job.error) + '</div>' : "") +
+            '</td>' +
+            '<td>' + esc(fmtTime(job.updatedAt)) + '</td>' +
+          '</tr>'
+        ).join("") +
+      "</tbody></table>" +
+      (totals.total > jobs.length ? '<div class="hint">这里只显示最近 ' + esc(jobs.length) + ' 条，历史总数 ' + esc(totals.total) + '。</div>' : "");
+    }
+
     function renderSessions(data) {
       const panel = document.getElementById("sessions-panel");
       const state = data.state || {};
-      const sessions = state.sessions || [];
+      const allSessions = state.sessions || [];
+      const needle = (sessionSearch.value || "").trim().toLowerCase();
+      const mode = sessionFilter.value || "all";
+      const sessions = allSessions.filter((session) => {
+        const runningJobs = Number(session.runningBackgroundJobCount || 0);
+        const failedJobs = Number(session.failedBackgroundJobCount || 0);
+        const inboundCount = Number(session.openInboundCount || 0);
+        if (mode === "active" && !session.activeTurnId) return false;
+        if (mode === "inbound" && inboundCount === 0) return false;
+        if (mode === "jobs" && runningJobs === 0) return false;
+        if (mode === "issues" && failedJobs === 0) return false;
+        if (!needle) return true;
+        const haystack = [
+          session.key,
+          session.channelId,
+          session.rootThreadTs,
+          session.workspacePath,
+          summarizeSessionLead(session),
+          ...(session.openInbound || []).map((item) => item.textPreview || ""),
+          ...(session.backgroundJobs || []).map((job) => [job.kind, job.cwd, job.error].filter(Boolean).join(" "))
+        ].join("\n").toLowerCase();
+        return haystack.includes(needle);
+      });
       const parts = [];
       if (sessions.length > 0) {
         parts.push(
@@ -1059,43 +1286,32 @@ function renderAdminPage(options: {
             const totalJobs = Number(session.backgroundJobCount || 0);
             const failedJobs = Number(session.failedBackgroundJobCount || 0);
             const turnBadge = isActive ? renderBadge("active", "good") : renderBadge("idle", "warn");
-            const jobsSection = jobs.length
-              ? '<div class="hint" style="margin-top:12px;"><strong>关联后台任务</strong> · 运行中 ' + esc(runningJobs) + ' / 总计 ' + esc(totalJobs) + (failedJobs > 0 ? ' / 失败 ' + esc(failedJobs) : "") + '</div>' +
-                jobs
-                  .map((job) =>
-                    '<div class="item" style="margin-top:8px;">' +
-                      '<div class="item-head"><div class="item-title mono">' + esc(job.id || "—") + '</div>' + renderBadge(job.status || "unknown", statusTone(job.status)) + '</div>' +
-                      '<div class="meta"><span>类型：' + esc(job.kind || "—") + '</span><span>更新时间：' + esc(fmtTime(job.updatedAt)) + '</span></div>' +
-                      '<div class="hint mono">' + esc(job.cwd || "—") + '</div>' +
-                      (job.error ? '<div class="item-text danger">' + esc(job.error) + '</div>' : "") +
-                    '</div>'
-                  )
-                  .join("") +
-                (totalJobs > jobs.length ? '<div class="hint" style="margin-top:8px;">这里只显示最近 ' + esc(jobs.length) + ' 条，历史任务总数是 ' + esc(totalJobs) + '。</div>' : "")
-              : '<div class="hint" style="margin-top:12px;">没有关联后台任务。</div>';
-            const inboundSection = inbound.length
-              ? '<div class="hint" style="margin-top:12px;"><strong>待处理消息</strong></div>' +
-                inbound
-                  .map((item) =>
-                    '<div class="item" style="margin-top:8px;">' +
-                      '<div class="item-head"><div class="item-title mono">' + esc(item.messageTs || "—") + '</div>' + renderBadge(item.status || "unknown", statusTone(item.status)) + '</div>' +
-                      '<div class="meta"><span>来源：' + esc(item.source || "—") + '</span></div>' +
-                      '<div class="item-text">' + esc(item.textPreview || "—") + '</div>' +
-                    '</div>'
-                  )
-                  .join("")
-              : '<div class="hint" style="margin-top:12px;">没有待处理消息。</div>';
+            const lead = summarizeSessionLead(session);
             return (
             '<details class="session-shell">' +
               '<summary class="session-summary">' +
                 '<div class="session-summary-top">' +
                   '<div class="session-summary-main">' +
                     '<div class="session-summary-title mono">' + esc(session.key || "—") + '</div>' +
-                    '<div class="session-summary-meta"><span>最近更新：' + esc(fmtTime(session.updatedAt)) + '</span><span>最近 Slack 回复：' + esc(fmtTime(session.lastSlackReplyAt)) + "</span></div>" +
+                    '<div class="session-summary-meta"><span>channel ' + esc(session.channelId || "—") + '</span><span>thread ' + esc(session.rootThreadTs || "—") + '</span></div>' +
+                  '</div>' +
+                  '<div class="session-summary-cell">' +
+                    '<div class="session-summary-label">最近状态</div>' +
+                    '<div class="session-summary-value">更新 ' + esc(fmtTime(session.updatedAt)) + '</div>' +
+                    '<div class="session-summary-value">回复 ' + esc(fmtTime(session.lastSlackReplyAt)) + '</div>' +
+                  '</div>' +
+                  '<div class="session-summary-cell">' +
+                    '<div class="session-summary-label">资源</div>' +
+                    '<div class="session-summary-value">待处理 ' + esc(session.openInboundCount || 0) + ' · 运行中任务 ' + esc(runningJobs) + ' · 总任务 ' + esc(totalJobs) + '</div>' +
+                    '<div class="session-summary-value">失败任务 ' + esc(failedJobs) + '</div>' +
+                  '</div>' +
+                  '<div class="session-summary-cell">' +
+                    '<div class="session-summary-label">当前线索</div>' +
+                    '<div class="session-summary-value truncate">' + esc(lead) + '</div>' +
                   '</div>' +
                   '<div class="session-summary-side">' +
                     turnBadge +
-                    '<div class="tiny">点开查看消息和任务</div>' +
+                    '<div class="tiny mono">' + esc(session.workspacePath || "—") + '</div>' +
                   '</div>' +
                 '</div>' +
                 '<div class="session-counts">' +
@@ -1111,15 +1327,23 @@ function renderAdminPage(options: {
                 '<div class="meta"><span>工作目录：<span class="mono">' + esc(session.workspacePath || "—") + '</span></span>' +
                 (session.activeTurnId ? '<span>turn：<span class="mono">' + esc(session.activeTurnId) + '</span></span>' : "") +
                 '</div>' +
-                inboundSection +
-                jobsSection +
+                '<div class="session-detail-grid">' +
+                  '<div class="subpanel">' +
+                    '<div class="subpanel-head"><div class="subpanel-title">待处理消息</div><div class="subpanel-meta">当前 ' + esc(inbound.length) + ' 条</div></div>' +
+                    renderDenseInboundTable(inbound) +
+                  '</div>' +
+                  '<div class="subpanel">' +
+                    '<div class="subpanel-head"><div class="subpanel-title">后台任务</div><div class="subpanel-meta">运行中 ' + esc(runningJobs) + ' / 总计 ' + esc(totalJobs) + (failedJobs > 0 ? ' / 失败 ' + esc(failedJobs) : '') + '</div></div>' +
+                    renderDenseJobsTable(jobs, { total: totalJobs }) +
+                  '</div>' +
+                '</div>' +
               '</div>' +
             "</details>"
             );
           }).join("")
         );
       } else {
-        parts.push('<div class="empty">当前没有任何 session。</div>');
+        parts.push('<div class="empty">当前筛选条件下没有 session。</div>');
       }
       panel.innerHTML = parts.join("");
     }
@@ -1134,7 +1358,7 @@ function renderAdminPage(options: {
       panel.innerHTML = logs.map((entry) => {
         const level = String(entry.level || "info").toLowerCase();
         const tone = level === "warn" ? "warn" : level === "error" ? "error" : "";
-        const meta = entry.meta ? '<pre>' + esc(JSON.stringify(entry.meta, null, 2)) + "</pre>" : "";
+        const meta = entry.meta ? '<details><summary class="tiny">展开 meta</summary><pre>' + esc(JSON.stringify(entry.meta, null, 2)) + "</pre></details>" : "";
         return '<div class="log-entry ' + tone + '">' +
           '<div class="item-head"><div class="item-title">' + esc(entry.message || entry.raw || "log") + '</div>' + renderBadge(level, tone) + '</div>' +
           '<div class="meta"><span>' + esc(fmtTime(entry.ts)) + "</span></div>" +
@@ -1144,6 +1368,7 @@ function renderAdminPage(options: {
     }
 
     function render(data) {
+      latestStatus = data;
       renderSummary(data);
       renderService(data);
       renderAccount(data);
@@ -1247,6 +1472,12 @@ function renderAdminPage(options: {
     }
 
     refreshButton.addEventListener("click", refresh);
+    sessionSearch.addEventListener("input", () => {
+      if (latestStatus) renderSessions(latestStatus);
+    });
+    sessionFilter.addEventListener("change", () => {
+      if (latestStatus) renderSessions(latestStatus);
+    });
     dialogs.forEach(([dialogId, openId, closeId]) => bindDialog(dialogId, openId, closeId));
 
     document.getElementById("submit-auth-dialog").addEventListener("click", () =>

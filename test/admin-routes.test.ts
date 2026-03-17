@@ -114,6 +114,7 @@ describe("admin routes", () => {
     expect(html).toContain("替换 .credentials.json");
     expect(html).toContain("替换 config.toml");
     expect(html).toContain("session-shell");
-    expect(html).toContain("点开查看消息和任务");
+    expect(html).toContain("session-search");
+    expect(html).toContain("高密度视图");
   });
 });
