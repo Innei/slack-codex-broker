@@ -205,6 +205,91 @@ export class SlackInboundStore {
     await this.#sessions.resetInflightMessages(session.channelId, session.rootThreadTs, turnId);
   }
 
+  async reconcileOrphanedInflightMessages(session: SlackSessionRecord): Promise<{
+    readonly markedDoneCount: number;
+    readonly resetToPendingCount: number;
+  }> {
+    if (session.activeTurnId) {
+      return {
+        markedDoneCount: 0,
+        resetToPendingCount: 0
+      };
+    }
+
+    const inflightMessages = this.#sessions.listInboundMessages({
+      channelId: session.channelId,
+      rootThreadTs: session.rootThreadTs,
+      status: "inflight"
+    });
+
+    if (inflightMessages.length === 0) {
+      return {
+        markedDoneCount: 0,
+        resetToPendingCount: 0
+      };
+    }
+
+    const batches = new Map<string, PersistedInboundMessage[]>();
+    for (const message of inflightMessages) {
+      const key = message.batchId ?? `message:${message.messageTs}`;
+      const existing = batches.get(key);
+      if (existing) {
+        existing.push(message);
+        continue;
+      }
+      batches.set(key, [message]);
+    }
+
+    const markDoneTs: string[] = [];
+    const resetToPendingTs: string[] = [];
+
+    for (const batchMessages of batches.values()) {
+      const latestSlackMessageTs = batchMessages
+        .filter((message) => isSlackInboundSource(message.source))
+        .map((message) => message.messageTs)
+        .sort(compareSlackTs)
+        .at(-1);
+
+      const shouldMarkDone = Boolean(
+        latestSlackMessageTs &&
+        session.lastDeliveredMessageTs &&
+        compareSlackTs(latestSlackMessageTs, session.lastDeliveredMessageTs) <= 0
+      );
+
+      const target = shouldMarkDone ? markDoneTs : resetToPendingTs;
+      target.push(...batchMessages.map((message) => message.messageTs));
+    }
+
+    if (markDoneTs.length > 0) {
+      await this.#sessions.updateInboundMessagesForBatch(
+        session.channelId,
+        session.rootThreadTs,
+        markDoneTs,
+        {
+          status: "done",
+          batchId: undefined
+        }
+      );
+    }
+
+    if (resetToPendingTs.length > 0) {
+      await this.#sessions.updateInboundMessagesForBatch(
+        session.channelId,
+        session.rootThreadTs,
+        resetToPendingTs,
+        {
+          status: "pending",
+          batchId: undefined
+        }
+      );
+    }
+
+    return {
+      markedDoneCount: markDoneTs.length,
+      resetToPendingCount: resetToPendingTs.length
+    };
+  }
+
   async createRecoveredBatchInput(
     session: SlackSessionRecord,
     messages: readonly PersistedInboundMessage[] | readonly ResolvedSlackThreadMessage[] | readonly SlackThreadMessage[],

@@ -1040,8 +1040,14 @@ export class SlackConversationService {
 
     let resumedSessionCount = 0;
     let resumedMessageCount = 0;
+    let orphanedInflightDoneCount = 0;
+    let orphanedInflightResetCount = 0;
 
     for (const session of sessions) {
+      const reconciled = await this.#inboundStore.reconcileOrphanedInflightMessages(session);
+      orphanedInflightDoneCount += reconciled.markedDoneCount;
+      orphanedInflightResetCount += reconciled.resetToPendingCount;
+
       const resumedCount = await this.#resumePendingDispatch(session.key, {
         forceReset: true
       });
@@ -1057,7 +1063,14 @@ export class SlackConversationService {
     if (resumedSessionCount > 0) {
       logger.warn("Recovered pending Slack dispatch backlog during broker startup", {
         resumedSessionCount,
-        resumedMessageCount
+        resumedMessageCount,
+        orphanedInflightDoneCount,
+        orphanedInflightResetCount
+      });
+    } else if (orphanedInflightDoneCount > 0 || orphanedInflightResetCount > 0) {
+      logger.warn("Reconciled orphaned inflight Slack messages during broker startup", {
+        orphanedInflightDoneCount,
+        orphanedInflightResetCount
       });
     }
   }
@@ -1073,6 +1086,15 @@ export class SlackConversationService {
       const runtime = this.#getRuntimeSession(session.key);
       if (runtime.processing) {
         continue;
+      }
+
+      const reconciled = await this.#inboundStore.reconcileOrphanedInflightMessages(session);
+      if (reconciled.markedDoneCount > 0 || reconciled.resetToPendingCount > 0) {
+        logger.warn("Reconciled orphaned inflight Slack messages for idle session", {
+          sessionKey: session.key,
+          markedDoneCount: reconciled.markedDoneCount,
+          resetToPendingCount: reconciled.resetToPendingCount
+        });
       }
 
       if (runtime.blockedUntilMs && runtime.blockedUntilMs > nowMs) {
