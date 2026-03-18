@@ -60,7 +60,10 @@ export class AdminService {
         jobs: jobsBySession.get(session.key) ?? []
       })
     );
-    const account = await this.#readAccountSummary();
+    const [account, rateLimits] = await Promise.all([
+      this.#readAccountSummary(),
+      this.#readAccountRateLimits()
+    ]);
     const backgroundJobCount = backgroundJobs.length;
     const runningBackgroundJobCount = backgroundJobs.filter((job) => job.status === "running").length;
     const failedBackgroundJobCount = backgroundJobs.filter((job) => job.status === "failed").length;
@@ -84,6 +87,7 @@ export class AdminService {
         configToml: await this.#fileInfo(path.join(this.options.config.codexHome, "config.toml"))
       },
       account,
+      rateLimits,
       state: {
         sessionCount: allSessions.length,
         activeCount: activeSessions.length,
@@ -170,12 +174,23 @@ export class AdminService {
       return {
         ok: true,
         account: account.account ?? null,
-        quota: account.quota ?? account.usage ?? null,
-        requiresOpenaiAuth: account.requiresOpenaiAuth ?? false,
-        note:
-          account.quota == null && account.usage == null
-            ? "Codex app-server account/read did not expose quota or usage fields."
-            : undefined
+        requiresOpenaiAuth: account.requiresOpenaiAuth ?? false
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  async #readAccountRateLimits(): Promise<Record<string, unknown>> {
+    try {
+      const response = await this.options.codex.readAccountRateLimits();
+      return {
+        ok: true,
+        rateLimits: response.rateLimits,
+        rateLimitsByLimitId: response.rateLimitsByLimitId
       };
     } catch (error) {
       return {

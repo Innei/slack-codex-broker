@@ -14,7 +14,7 @@ interface TestServer {
 }
 
 async function createServer(
-  onMessage: (socket: WebSocket, message: { id?: string; method?: string }) => void
+  onMessage: (socket: WebSocket, message: { id?: string; method?: string; params?: Record<string, unknown> }) => void
 ): Promise<TestServer> {
   const server = http.createServer();
   const wsServer = new WebSocketServer({ server });
@@ -26,7 +26,7 @@ async function createServer(
       connections.delete(socket);
     });
     socket.on("message", (data) => {
-      onMessage(socket, JSON.parse(data.toString()) as { id?: string; method?: string });
+      onMessage(socket, JSON.parse(data.toString()) as { id?: string; method?: string; params?: Record<string, unknown> });
     });
   });
 
@@ -190,6 +190,123 @@ describe("AppServerClient disconnect handling", () => {
       status: "completed",
       finalMessage: "done",
       errorMessage: undefined
+    });
+  });
+
+  it("reads account rate limits through account/rateLimits/read", async () => {
+    const server = await createServer((socket, message) => {
+      if (message.method === "initialize") {
+        socket.send(JSON.stringify({
+          id: message.id,
+          result: { ok: true }
+        }));
+        return;
+      }
+
+      if (message.method === "account/rateLimits/read") {
+        expect(message.params).toBeUndefined();
+        socket.send(JSON.stringify({
+          id: message.id,
+          result: {
+            rateLimits: {
+              limitId: "codex",
+              limitName: "Codex",
+              primary: {
+                usedPercent: 42,
+                windowDurationMins: 300,
+                resetsAt: 1_735_692_000
+              },
+              secondary: {
+                usedPercent: 7,
+                windowDurationMins: 10_080,
+                resetsAt: 1_735_999_999
+              },
+              credits: {
+                hasCredits: true,
+                unlimited: false,
+                balance: "18.75"
+              },
+              planType: "pro"
+            },
+            rateLimitsByLimitId: {
+              codex: {
+                limitId: "codex",
+                limitName: "Codex",
+                primary: {
+                  usedPercent: 42,
+                  windowDurationMins: 300,
+                  resetsAt: 1_735_692_000
+                },
+                secondary: {
+                  usedPercent: 7,
+                  windowDurationMins: 10_080,
+                  resetsAt: 1_735_999_999
+                },
+                credits: {
+                  hasCredits: true,
+                  unlimited: false,
+                  balance: "18.75"
+                },
+                planType: "pro"
+              }
+            }
+          }
+        }));
+      }
+    });
+    servers.push(server);
+
+    const client = new AppServerClient({
+      url: server.url,
+      serviceName: "test",
+      brokerHttpBaseUrl: "http://127.0.0.1:3000",
+      reposRoot: "/tmp/repos"
+    });
+
+    await client.connect();
+    await expect(client.readAccountRateLimits()).resolves.toEqual({
+      rateLimits: {
+        limitId: "codex",
+        limitName: "Codex",
+        primary: {
+          usedPercent: 42,
+          windowDurationMins: 300,
+          resetsAt: 1_735_692_000
+        },
+        secondary: {
+          usedPercent: 7,
+          windowDurationMins: 10_080,
+          resetsAt: 1_735_999_999
+        },
+        credits: {
+          hasCredits: true,
+          unlimited: false,
+          balance: "18.75"
+        },
+        planType: "pro"
+      },
+      rateLimitsByLimitId: {
+        codex: {
+          limitId: "codex",
+          limitName: "Codex",
+          primary: {
+            usedPercent: 42,
+            windowDurationMins: 300,
+            resetsAt: 1_735_692_000
+          },
+          secondary: {
+            usedPercent: 7,
+            windowDurationMins: 10_080,
+            resetsAt: 1_735_999_999
+          },
+          credits: {
+            hasCredits: true,
+            unlimited: false,
+            balance: "18.75"
+          },
+          planType: "pro"
+        }
+      }
     });
   });
 

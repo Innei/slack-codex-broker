@@ -4,6 +4,7 @@ import type { SlackSessionRecord, SlackUserIdentity } from "../../types.js";
 import type {
   AppServerAccountSummary,
   CodexInputItem,
+  AppServerRateLimitsResponse,
   ReadTurnResultOptions,
   ReadTurnResult,
   StartedTurn
@@ -142,6 +143,10 @@ export class CodexBroker {
 
   async readAccountSummary(refreshToken = false): Promise<AppServerAccountSummary> {
     return await this.#withRecovery(() => this.#client.readAccountSummary(refreshToken));
+  }
+
+  async readAccountRateLimits(): Promise<AppServerRateLimitsResponse> {
+    return await this.#withRecovery(() => this.#client.readAccountRateLimits());
   }
 
   async restartRuntime(reason = "admin runtime restart"): Promise<void> {

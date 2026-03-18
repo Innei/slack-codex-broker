@@ -123,6 +123,52 @@ export class MockCodexAppServer {
           requiresOpenaiAuth: false
         });
         return;
+      case "account/rateLimits/read":
+        this.#respond(socket, message.id, {
+          rateLimits: {
+            limitId: "codex",
+            limitName: "Codex",
+            primary: {
+              usedPercent: 12,
+              windowDurationMins: 300,
+              resetsAt: 1_777_777_777
+            },
+            secondary: {
+              usedPercent: 3,
+              windowDurationMins: 10_080,
+              resetsAt: 1_778_888_888
+            },
+            credits: {
+              hasCredits: true,
+              unlimited: false,
+              balance: "42.5"
+            },
+            planType: "team"
+          },
+          rateLimitsByLimitId: {
+            codex: {
+              limitId: "codex",
+              limitName: "Codex",
+              primary: {
+                usedPercent: 12,
+                windowDurationMins: 300,
+                resetsAt: 1_777_777_777
+              },
+              secondary: {
+                usedPercent: 3,
+                windowDurationMins: 10_080,
+                resetsAt: 1_778_888_888
+              },
+              credits: {
+                hasCredits: true,
+                unlimited: false,
+                balance: "42.5"
+              },
+              planType: "team"
+            }
+          }
+        });
+        return;
       case "thread/start": {
         const threadId = randomUUID();
         this.#threads.set(threadId, {

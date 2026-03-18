@@ -1033,6 +1033,13 @@ function renderAdminPage(options: {
       }
     }
 
+    function fmtUnixSeconds(value) {
+      if (value == null) return "—";
+      const seconds = Number(value);
+      if (!Number.isFinite(seconds)) return String(value);
+      return fmtTime(seconds * 1000);
+    }
+
     function fmtDuration(totalSeconds) {
       const seconds = Number(totalSeconds || 0);
       if (!Number.isFinite(seconds) || seconds <= 0) return "刚启动";
@@ -1086,6 +1093,7 @@ function renderAdminPage(options: {
       const service = data.service || {};
       const state = data.state || {};
       const account = data.account || {};
+      const rateLimits = data.rateLimits || {};
       const runningJobs = Number(state.runningBackgroundJobCount || 0);
       const failedJobs = Number(state.failedBackgroundJobCount || 0);
 
@@ -1096,7 +1104,13 @@ function renderAdminPage(options: {
       const accountLabel = account.ok ? ((account.account && account.account.planType) || "已登录") : "异常";
       document.getElementById("summary-account").textContent = accountLabel;
       document.getElementById("summary-account-detail").textContent = account.ok
-        ? (((account.account && account.account.email) || "未提供邮箱") + " · " + ((account.account && account.account.type) || "未知类型"))
+        ? (
+            ((account.account && account.account.email) || "未提供邮箱") +
+            " · " +
+            ((account.account && account.account.type) || "未知类型") +
+            " · " +
+            summarizeRateLimits(rateLimits)
+          )
         : ("账号读取失败：" + (account.error || "unknown error"));
 
       document.getElementById("summary-sessions").textContent =
@@ -1136,6 +1150,77 @@ function renderAdminPage(options: {
         '</div>';
     }
 
+    function formatRateLimitWindow(window) {
+      if (!window) {
+        return "—";
+      }
+
+      const parts = [String(window.usedPercent) + "% used"];
+      if (window.windowDurationMins != null) {
+        parts.push(String(window.windowDurationMins) + "m");
+      }
+      if (window.resetsAt != null) {
+        parts.push("reset " + fmtUnixSeconds(window.resetsAt));
+      }
+      return parts.join(" · ");
+    }
+
+    function formatCreditsSnapshot(credits) {
+      if (!credits) {
+        return "—";
+      }
+
+      const parts = [credits.unlimited ? "unlimited" : credits.hasCredits ? "has credits" : "no credits"];
+      if (credits.balance != null) {
+        parts.push("balance " + credits.balance);
+      }
+      return parts.join(" · ");
+    }
+
+    function summarizeRateLimits(rateLimits) {
+      if (!rateLimits || !rateLimits.ok) {
+        return rateLimits && rateLimits.error ? "额度读取失败：" + rateLimits.error : "额度不可用";
+      }
+
+      const snapshot = rateLimits.rateLimits || {};
+      const parts = [];
+      if (snapshot.planType) {
+        parts.push(String(snapshot.planType));
+      }
+      if (snapshot.limitName || snapshot.limitId) {
+        parts.push([snapshot.limitName, snapshot.limitId].filter(Boolean).join(" / "));
+      }
+      const primary = formatRateLimitWindow(snapshot.primary);
+      if (primary !== "—") {
+        parts.push("主 " + primary);
+      }
+      const credits = formatCreditsSnapshot(snapshot.credits);
+      if (credits !== "—") {
+        parts.push("credits " + credits);
+      }
+      return parts.length > 0 ? parts.join(" · ") : "额度已读取";
+    }
+
+    function renderRateLimitBucket(snapshot, key) {
+      const label = [snapshot.limitName, snapshot.limitId || key].filter(Boolean).join(" / ") || key;
+      const primary = formatRateLimitWindow(snapshot.primary);
+      const secondary = formatRateLimitWindow(snapshot.secondary);
+      const credits = formatCreditsSnapshot(snapshot.credits);
+      return [
+        '<div class="item">',
+          '<div class="item-head">',
+            '<div class="item-title mono">' + esc(label) + '</div>',
+            renderBadge(snapshot.planType || "unknown", "good") +
+          '</div>',
+          '<div class="meta">' +
+            '<span>主：' + esc(primary) + '</span>' +
+            '<span>副：' + esc(secondary) + '</span>' +
+            '<span>credits：' + esc(credits) + '</span>' +
+          '</div>',
+        '</div>'
+      ].join("");
+    }
+
     function renderAccount(data) {
       const panel = document.getElementById("account-card");
       const account = data.account || {};
@@ -1145,20 +1230,47 @@ function renderAdminPage(options: {
       }
 
       const summary = account.account || {};
+      const rateLimits = data.rateLimits || {};
+      const rateLimitSnapshot = rateLimits.ok ? (rateLimits.rateLimits || null) : null;
+      const rateLimitBuckets = rateLimits.ok && rateLimits.rateLimitsByLimitId ? Object.entries(rateLimits.rateLimitsByLimitId) : [];
+      const extraRateLimitBuckets = rateLimitBuckets.filter(([key]) => !rateLimitSnapshot || key !== rateLimitSnapshot.limitId);
       panel.innerHTML = [
         '<div class="compact-kv">' +
           [
             ["套餐", summary.planType || "unknown"],
             ["类型", summary.type || "—"],
             ["邮箱", summary.email || "—"],
-            ["额度", account.quota ? "已提供" : "未提供"]
+            ["额度", rateLimits.ok ? "已提供" : "未提供"]
           ].map(([k, v]) =>
             '<div class="compact-stat"><div class="compact-stat-label">' + esc(k) + '</div><div class="compact-stat-value">' + esc(v) + "</div></div>"
           ).join("") +
         '</div>',
-        account.quota
-          ? '<pre>' + esc(JSON.stringify(account.quota, null, 2)) + "</pre>"
-          : '<div class="item"><div class="item-title">额度信息</div><div class="item-text muted">' + esc(account.note || "当前接口没有返回 quota 或 usage 字段。") + "</div></div>"
+        '<div class="item">' +
+          '<div class="item-head">' +
+            '<div class="item-title">额度 / credits</div>' +
+            '<div class="tiny mono">account/rateLimits/read</div>' +
+          '</div>' +
+          (rateLimits.ok && rateLimitSnapshot
+            ? [
+                '<div class="compact-kv">' +
+                  [
+                    ["主额度", [rateLimitSnapshot.limitName, rateLimitSnapshot.limitId].filter(Boolean).join(" / ") || "—"],
+                    ["计划", rateLimitSnapshot.planType || "—"],
+                    ["主窗口", formatRateLimitWindow(rateLimitSnapshot.primary)],
+                    ["副窗口", formatRateLimitWindow(rateLimitSnapshot.secondary)],
+                    ["credits", formatCreditsSnapshot(rateLimitSnapshot.credits)],
+                    ["限额桶", String(rateLimitBuckets.length || 1)]
+                  ].map(([k, v]) =>
+                    '<div class="compact-stat"><div class="compact-stat-label">' + esc(k) + '</div><div class="compact-stat-value">' + esc(v) + "</div></div>"
+                  ).join("") +
+                '</div>' +
+                (extraRateLimitBuckets.length
+                  ? '<div class="list">' + extraRateLimitBuckets.map(([key, snapshot]) => renderRateLimitBucket(snapshot, key)).join("") + '</div>'
+                  : "")
+              ].join("")
+            : '<div class="item-text muted">' + esc(rateLimits.error || "当前接口没有返回 rateLimits。") + "</div>"
+          ) +
+        '</div>'
       ].join("");
     }
 

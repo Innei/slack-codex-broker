@@ -8,6 +8,27 @@ import type { CodexTurnResult, SlackUserIdentity } from "../../types.js";
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
+interface RawRateLimitWindow {
+  readonly usedPercent?: number;
+  readonly windowDurationMins?: number | null;
+  readonly resetsAt?: number | null;
+}
+
+interface RawCreditsSnapshot {
+  readonly hasCredits?: boolean;
+  readonly unlimited?: boolean;
+  readonly balance?: string | null;
+}
+
+interface RawRateLimitSnapshot {
+  readonly limitId?: string | null;
+  readonly limitName?: string | null;
+  readonly primary?: RawRateLimitWindow | null;
+  readonly secondary?: RawRateLimitWindow | null;
+  readonly credits?: RawCreditsSnapshot | null;
+  readonly planType?: string | null;
+}
+
 interface PendingRequest {
   readonly resolve: (value: any) => void;
   readonly reject: (error: Error) => void;
@@ -61,6 +82,34 @@ export interface AppServerAccountSummary {
   readonly quota?: JsonValue | undefined;
   readonly usage?: JsonValue | undefined;
   readonly requiresOpenaiAuth?: boolean | undefined;
+}
+
+export interface AppServerRateLimitWindow {
+  readonly usedPercent: number;
+  readonly windowDurationMins: number | null;
+  readonly resetsAt: number | null;
+}
+
+export interface AppServerCreditsSnapshot {
+  readonly hasCredits: boolean;
+  readonly unlimited: boolean;
+  readonly balance: string | null;
+}
+
+export type AppServerPlanType = "free" | "go" | "plus" | "pro" | "team" | "business" | "enterprise" | "edu" | "unknown" | string;
+
+export interface AppServerRateLimitSnapshot {
+  readonly limitId: string | null;
+  readonly limitName: string | null;
+  readonly primary: AppServerRateLimitWindow | null;
+  readonly secondary: AppServerRateLimitWindow | null;
+  readonly credits: AppServerCreditsSnapshot | null;
+  readonly planType: AppServerPlanType | null;
+}
+
+export interface AppServerRateLimitsResponse {
+  readonly rateLimits: AppServerRateLimitSnapshot;
+  readonly rateLimitsByLimitId: Record<string, AppServerRateLimitSnapshot> | null;
 }
 
 export class AppServerClient extends EventEmitter {
@@ -189,6 +238,22 @@ export class AppServerClient extends EventEmitter {
       quota: response.quota,
       usage: response.usage,
       requiresOpenaiAuth: response.requiresOpenaiAuth
+    };
+  }
+
+  async readAccountRateLimits(): Promise<AppServerRateLimitsResponse> {
+    const response = await this.request("account/rateLimits/read") as {
+      rateLimits?: RawRateLimitSnapshot;
+      rateLimitsByLimitId?: Record<string, RawRateLimitSnapshot> | null;
+    };
+
+    if (!response.rateLimits) {
+      throw new Error("Codex app-server did not return rate limits");
+    }
+
+    return {
+      rateLimits: normalizeRateLimitSnapshot(response.rateLimits),
+      rateLimitsByLimitId: normalizeRateLimitSnapshotMap(response.rateLimitsByLimitId)
     };
   }
 
@@ -566,7 +631,7 @@ export class AppServerClient extends EventEmitter {
     return normalizedResult;
   }
 
-  async request(method: string, params: JsonValue): Promise<JsonValue> {
+  async request(method: string, params?: JsonValue): Promise<JsonValue> {
     if (!this.#socket || this.#socket.readyState !== WebSocket.OPEN) {
       throw new Error("Codex app-server websocket is not connected");
     }
@@ -585,11 +650,18 @@ export class AppServerClient extends EventEmitter {
       requestId,
       method
     });
-    const payload = JSON.stringify({
-      id: requestId,
-      method,
-      params
-    });
+    const payload = JSON.stringify(
+      params === undefined
+        ? {
+            id: requestId,
+            method
+          }
+        : {
+            id: requestId,
+            method,
+            params
+          }
+    );
 
     return await new Promise<JsonValue>((resolve, reject) => {
       this.#pendingRequests.set(requestId, { resolve, reject });
@@ -803,4 +875,51 @@ function normalizeTurnStatus(status: unknown): ReadTurnResult["status"] {
   }
 
   return "unknown";
+}
+
+function normalizeRateLimitSnapshot(snapshot: RawRateLimitSnapshot): AppServerRateLimitSnapshot {
+  return {
+    limitId: snapshot.limitId ?? null,
+    limitName: snapshot.limitName ?? null,
+    primary: normalizeRateLimitWindow(snapshot.primary),
+    secondary: normalizeRateLimitWindow(snapshot.secondary),
+    credits: normalizeCreditsSnapshot(snapshot.credits),
+    planType: snapshot.planType ?? null
+  };
+}
+
+function normalizeRateLimitSnapshotMap(
+  snapshots: Record<string, RawRateLimitSnapshot> | null | undefined
+): Readonly<Record<string, AppServerRateLimitSnapshot>> | null {
+  if (!snapshots) {
+    return null;
+  }
+
+  return Object.fromEntries(
+    Object.entries(snapshots).map(([limitId, snapshot]) => [limitId, normalizeRateLimitSnapshot(snapshot)])
+  );
+}
+
+function normalizeRateLimitWindow(window: RawRateLimitWindow | null | undefined): AppServerRateLimitWindow | null {
+  if (!window) {
+    return null;
+  }
+
+  return {
+    usedPercent: Number(window.usedPercent ?? 0),
+    windowDurationMins: window.windowDurationMins ?? null,
+    resetsAt: window.resetsAt ?? null
+  };
+}
+
+function normalizeCreditsSnapshot(credits: RawCreditsSnapshot | null | undefined): AppServerCreditsSnapshot | null {
+  if (!credits) {
+    return null;
+  }
+
+  return {
+    hasCredits: Boolean(credits.hasCredits),
+    unlimited: Boolean(credits.unlimited),
+    balance: credits.balance ?? null
+  };
 }

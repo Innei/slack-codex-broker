@@ -114,6 +114,7 @@ describe("admin routes", () => {
     expect(html).toContain("open-credentials-dialog");
     expect(html).toContain("open-config-dialog");
     expect(html).toContain("运行概览");
+    expect(html).toContain("额度 / credits");
     expect(html).not.toContain("固定状态都压在这里");
     expect(html).not.toContain("<h2>替换登录态</h2>");
     expect(html).toContain("session-shell");
