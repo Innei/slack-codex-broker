@@ -113,13 +113,13 @@ describe("admin routes", () => {
     expect(html).toContain("open-auth-dialog");
     expect(html).toContain("open-credentials-dialog");
     expect(html).toContain("open-config-dialog");
-    expect(html).toContain("运行概览");
-    expect(html).toContain("额度 / credits");
-    expect(html).not.toContain("固定状态都压在这里");
+    expect(html).toContain("Account Quota");
+    expect(html).toContain("Auth Files");
+    expect(html).toContain("Runtime Info");
     expect(html).not.toContain("<h2>替换登录态</h2>");
-    expect(html).toContain("session-shell");
+    expect(html).toContain("session-row");
     expect(html).toContain("session-search");
-    expect(html).not.toContain("这里改成高密度视图");
+    expect(html).not.toContain("固定状态都压在这里");
   });
 
   it("emits admin page inline script without syntax errors", async () => {

@@ -122,876 +122,341 @@ function renderAdminPage(options: {
   <style>
     :root {
       color-scheme: dark;
-      --bg: #ff962d;
-      --bg-deep: #d97414;
-      --panel: #070707;
-      --panel-soft: #0a0a0a;
-      --panel-strong: #030303;
-      --line: rgba(255, 154, 47, 0.15);
-      --line-strong: rgba(255, 154, 47, 0.34);
-      --text: #fff1de;
-      --muted: #a48f75;
-      --accent: #ff9a2f;
-      --accent-soft: rgba(255, 154, 47, 0.12);
+      --accent: #ff962d;
+      --accent-soft: rgba(255, 150, 45, 0.1);
+      --bg: #050505;
+      --panel: #0a0a0a;
+      --border: rgba(255, 150, 45, 0.2);
+      --border-strong: rgba(255, 150, 45, 0.4);
+      --text: #eee;
+      --muted: #888;
       --good: #34dd93;
-      --good-soft: rgba(52, 221, 147, 0.12);
       --warn: #ffcb63;
-      --warn-soft: rgba(255, 203, 99, 0.14);
       --danger: #ff7458;
-      --danger-soft: rgba(255, 116, 88, 0.14);
-      --mono: "IBM Plex Mono", "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
-      --sans: "IBM Plex Mono", "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+      --mono: "IBM Plex Mono", "SF Mono", "JetBrains Mono", ui-monospace, monospace;
     }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
-      min-height: 100vh;
-      background:
-        radial-gradient(circle at 14% 12%, rgba(255, 198, 122, 0.32), transparent 0 18%),
-        radial-gradient(circle at 86% 10%, rgba(255, 206, 139, 0.22), transparent 0 16%),
-        linear-gradient(135deg, rgba(255,255,255,0.05) 0 4%, transparent 4% 14%, rgba(255,255,255,0.03) 14% 17%, transparent 17% 31%, rgba(255,255,255,0.04) 31% 35%, transparent 35% 100%),
-        linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+      background: var(--bg);
       color: var(--text);
-      font-family: var(--sans);
-      letter-spacing: 0.01em;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.4;
     }
     .wrap {
-      max-width: 1720px;
+      max-width: 1600px;
       margin: 0 auto;
-      padding: 24px;
-    }
-    .dashboard {
-      border: 1px solid rgba(255, 154, 47, 0.24);
-      border-radius: 18px;
-      background:
-        linear-gradient(180deg, rgba(10, 10, 10, 0.995), rgba(3, 3, 3, 0.995));
-      box-shadow:
-        0 30px 70px rgba(92, 34, 0, 0.28),
-        inset 0 0 0 1px rgba(255,255,255,0.015);
       padding: 16px;
     }
-    h1, h2, h3 {
-      margin: 0;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-    h1 {
-      font-size: 22px;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-    }
-    h2 {
-      font-size: 13px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    h3 {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    p {
-      margin: 0;
-      color: var(--muted);
-      line-height: 1.45;
-    }
-    .card {
-      background: rgba(7, 7, 7, 0.96);
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 14px;
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.01);
-    }
-    .headerbar {
+    header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 12px;
-      padding: 14px 16px;
-      border: 1px solid var(--line-strong);
-      border-radius: 14px;
-      background:
-        linear-gradient(180deg, rgba(255, 154, 47, 0.03), rgba(255, 154, 47, 0.01));
+      align-items: baseline;
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 8px;
+      margin-bottom: 16px;
     }
-    .header-main {
+    h1 { margin: 0; font-size: 18px; text-transform: uppercase; color: var(--accent); }
+    .header-meta { display: flex; gap: 12px; }
+    
+    .grid-summary {
       display: grid;
-      gap: 4px;
-      min-width: 0;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      margin-bottom: 16px;
     }
-    .header-subtitle {
-      color: var(--muted);
-      font-size: 11px;
-      line-height: 1.35;
-      text-transform: uppercase;
+    .summary-item {
+      background: var(--panel);
+      padding: 12px;
     }
-    .header-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-      justify-content: flex-end;
-    }
-    .summary-strip {
+    .summary-label { font-size: 10px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
+    .summary-value { font-size: 20px; font-weight: bold; color: var(--accent); }
+    .summary-detail { font-size: 11px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .main-layout {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-    .summary-pill {
-      display: grid;
-      gap: 4px;
-      min-height: 82px;
-      padding: 10px 12px;
-      background: var(--panel-soft);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-    }
-    .summary-pill-label {
-      color: var(--muted);
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    .summary-pill-value {
-      color: var(--accent);
-      font-size: 22px;
-      font-weight: 800;
-      line-height: 1.05;
-    }
-    .summary-pill-detail {
-      color: var(--muted);
-      font-size: 11px;
-      line-height: 1.35;
-    }
-    .layout {
-      display: grid;
-      grid-template-columns: minmax(0, 1.75fr) minmax(380px, 0.95fr);
-      gap: 12px;
+      grid-template-columns: 1fr 400px;
+      gap: 16px;
       align-items: start;
     }
-    .main-stack,
-    .side-stack,
-    .overview-stack {
-      display: grid;
-      gap: 12px;
-    }
-    .toolbar-strip {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 10px;
-    }
-    .toolbar-grow {
-      flex: 1 1 220px;
-    }
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 9px;
-      border-radius: 999px;
-      border: 1px solid var(--line-strong);
-      background: rgba(255, 154, 47, 0.08);
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    .badge.good { color: var(--good); background: var(--good-soft); }
-    .badge.warn { color: var(--warn); background: var(--warn-soft); }
-    .badge.danger { color: var(--danger); background: var(--danger-soft); }
-    .mono { font-family: var(--mono); }
-    .muted { color: var(--muted); }
-    .good { color: var(--good); }
-    .warn { color: var(--warn); }
-    .danger { color: var(--danger); }
-    .actions {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    button {
-      border: 0;
-      border-radius: 12px;
-      background: var(--accent);
-      color: #130800;
-      padding: 10px 14px;
-      font: inherit;
-      font-weight: 800;
-      cursor: pointer;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      transition: transform 120ms ease, opacity 120ms ease, background 120ms ease;
-    }
-    button:hover { transform: translateY(-1px); }
-    button:disabled {
-      opacity: 0.55;
-      cursor: default;
-      transform: none;
-    }
-    button.secondary {
-      background: transparent;
-      color: var(--text);
-      border: 1px solid var(--line);
-    }
-    input[type="password"], input[type="search"], input[type="file"], select, textarea {
-      width: 100%;
-      box-sizing: border-box;
-      border-radius: 12px;
-      border: 1px solid var(--line);
-      background: var(--panel-strong);
-      color: var(--text);
-      padding: 10px 12px;
-      font: inherit;
-    }
-    textarea {
-      min-height: 180px;
-      resize: vertical;
-      line-height: 1.45;
-      font-family: var(--mono);
-      font-size: 12px;
-    }
-    label {
-      display: grid;
-      gap: 6px;
-      color: var(--muted);
-      font-size: 13px;
-    }
-    .stack,
-    .list,
-    .log-list {
-      display: grid;
-      gap: 10px;
-    }
-    .item,
-    .compact-stat,
-    .log-entry,
-    .subpanel {
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 10px 12px;
-      background: rgba(255,255,255,0.015);
-    }
-    .item-head,
-    .section-head,
-    .subpanel-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: center;
+    section {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      margin-bottom: 16px;
     }
     .section-head {
-      align-items: flex-start;
-      margin-bottom: 12px;
-    }
-    .item-title,
-    .subpanel-title {
-      font-weight: 700;
-      word-break: break-word;
-    }
-    .item-text {
-      margin-top: 8px;
-      line-height: 1.55;
-      word-break: break-word;
-    }
-    .meta,
-    .auth-file-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px 12px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-    .compact-kv {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-    }
-    .compact-stat-label {
-      margin-bottom: 4px;
-      color: var(--muted);
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    .compact-stat-value {
-      font-size: 14px;
-      font-weight: 700;
-      word-break: break-word;
-    }
-    .status-line {
-      min-height: 18px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-    .hint {
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.45;
-    }
-    .empty {
-      padding: 12px;
-      border: 1px dashed var(--line-strong);
-      border-radius: 12px;
-      color: var(--muted);
-      background: rgba(255,255,255,0.01);
-    }
-    .log-entry.warn {
-      border-color: rgba(255, 203, 99, 0.28);
-      background: var(--warn-soft);
-    }
-    .log-entry.error {
-      border-color: rgba(255, 116, 88, 0.36);
-      background: var(--danger-soft);
-    }
-    .tiny {
-      font-size: 11px;
-      color: var(--muted);
-    }
-    .session-shell {
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: rgba(255,255,255,0.01);
-      overflow: hidden;
-    }
-    .session-shell[open] {
-      border-color: var(--line-strong);
-      background: rgba(255, 154, 47, 0.04);
-    }
-    .session-summary {
-      list-style: none;
-      cursor: pointer;
-      display: grid;
-      gap: 6px;
-      padding: 10px 12px;
-    }
-    .session-summary::-webkit-details-marker {
-      display: none;
-    }
-    .session-summary-top {
-      display: grid;
-      grid-template-columns: minmax(260px, 2.6fr) minmax(160px, 1fr) minmax(180px, 1.1fr) minmax(200px, 1.1fr) minmax(180px, 1fr);
-      gap: 6px;
-      align-items: start;
-    }
-    .session-summary-main {
-      display: grid;
-      gap: 4px;
-      min-width: 0;
-    }
-    .session-summary-title {
-      font-weight: 650;
-      word-break: break-word;
-      color: var(--accent);
-    }
-    .session-summary-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px 10px;
-      color: var(--muted);
-      font-size: 11px;
-    }
-    .session-summary-side {
-      display: grid;
-      gap: 6px;
-      align-content: start;
-      justify-items: end;
-    }
-    .session-counts {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-    }
-    .session-body {
-      padding: 0 14px 14px;
-      display: grid;
-      gap: 8px;
-    }
-    .session-divider {
-      height: 1px;
-      background: var(--line);
-    }
-    dialog.admin-modal {
-      border: 0;
-      padding: 0;
-      border-radius: 18px;
-      width: min(760px, calc(100vw - 24px));
-      background: transparent;
-      color: inherit;
-    }
-    dialog.admin-modal::backdrop {
-      background: rgba(3, 10, 18, 0.72);
-      backdrop-filter: blur(6px);
-    }
-    .modal-card {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 16px;
-      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
-      display: grid;
-      gap: 12px;
-    }
-    .modal-head {
+      background: var(--accent-soft);
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
-      gap: 12px;
-      align-items: flex-start;
-    }
-    .modal-copy {
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.55;
-    }
-    .modal-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .compact-kv {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-    }
-    .compact-stat {
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.012);
-      border-radius: 8px;
-      padding: 10px 12px;
-    }
-    .compact-stat-label {
-      font-size: 11px;
-      color: var(--muted);
-      margin-bottom: 4px;
-    }
-    .compact-stat-value {
-      font-size: 14px;
-      font-weight: 650;
-      word-break: break-word;
-    }
-    .session-toolbar {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
       align-items: center;
     }
-    .session-toolbar input {
-      min-width: 240px;
-      flex: 1 1 280px;
+    .section-title { font-size: 12px; font-weight: bold; text-transform: uppercase; color: var(--accent); }
+    
+    .toolbar { display: flex; gap: 8px; padding: 12px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.02); }
+    .toolbar input, .toolbar select { 
+      background: #000; border: 1px solid var(--border); color: var(--text); 
+      padding: 6px 10px; font-family: inherit; font-size: 12px; 
     }
-    .session-summary-cell {
-      min-width: 0;
+    .toolbar input[type="search"] { flex: 1; }
+
+    .session-table-header {
       display: grid;
-      gap: 4px;
-    }
-    .session-summary-label {
-      color: var(--muted);
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .session-summary-value {
-      font-size: 12px;
-      line-height: 1.3;
-      word-break: break-word;
-    }
-    .session-summary-value.truncate {
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-    .dense-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 0;
-      font-size: 12px;
-    }
-    .dense-table th,
-    .dense-table td {
-      padding: 6px 5px;
-      border-bottom: 1px solid var(--line);
-      vertical-align: top;
-    }
-    .dense-table th {
-      color: var(--muted);
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    .dense-table td code,
-    .dense-table td .mono {
-      font-size: 11px;
-    }
-    .session-detail-grid {
-      display: grid;
-      grid-template-columns: 1.3fr 1fr;
-      gap: 12px;
-    }
-    .subpanel-meta {
-      color: var(--muted);
-      font-size: 11px;
-    }
-    .auth-file-list {
-      display: grid;
+      grid-template-columns: 1.5fr 1fr 1.2fr 1fr 80px;
       gap: 8px;
-    }
-    .auth-file-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 12px;
-      align-items: center;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 10px 12px;
-      background: rgba(255,255,255,0.012);
-    }
-    .auth-file-main {
-      display: grid;
-      gap: 6px;
-      min-width: 0;
-    }
-    .auth-file-title-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      min-width: 0;
-    }
-    .auth-file-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 8px;
-      align-items: center;
-    }
-    .auth-file-title {
-      font-size: 13px;
-      font-weight: 700;
-    }
-    .auth-file-tag {
-      display: inline-flex;
-      align-items: center;
-      border-radius: 999px;
-      padding: 2px 8px;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,0.02);
-      color: var(--muted);
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-    .auth-file-path {
-      font-size: 11px;
-      line-height: 1.35;
-      color: var(--muted);
-      word-break: break-word;
-    }
-    .auth-file-actions {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-    }
-    .auth-file-actions button {
-      min-width: 88px;
       padding: 8px 12px;
-      font-size: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
     }
-    @media (max-width: 960px) {
-      .headerbar {
-        flex-direction: column;
-        align-items: stretch;
-      }
-      .summary-strip {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-      .layout {
-        grid-template-columns: 1fr;
-      }
-      .compact-kv {
-        grid-template-columns: 1fr;
-      }
-      .session-summary-top {
-        grid-template-columns: 1fr;
-      }
-      .session-detail-grid {
-        grid-template-columns: 1fr;
-      }
-      .auth-file-row {
-        grid-template-columns: 1fr;
-      }
-      .auth-file-actions {
-        justify-content: flex-start;
-      }
+    .session-list { display: grid; }
+    .session-row { border-bottom: 1px solid var(--border); }
+    .session-summary {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr 1.2fr 1fr 80px;
+      gap: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      align-items: center;
     }
-    @media (max-width: 640px) {
-      .wrap {
-        padding: 12px;
-      }
-      .summary-strip {
-        grid-template-columns: 1fr;
-      }
+    .session-summary:hover { background: rgba(255,150,45,0.05); }
+    .session-key { color: var(--accent); font-weight: bold; overflow: hidden; text-overflow: ellipsis; }
+    .session-body { padding: 12px; background: #000; border-top: 1px solid var(--border); }
+
+    .tui-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .tui-table th { text-align: left; color: var(--muted); padding: 4px 8px; border-bottom: 1px solid var(--border); font-size: 10px; text-transform: uppercase; }
+    .tui-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+    .auth-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      align-items: center;
+    }
+    .auth-info { display: grid; gap: 2px; }
+    .auth-path { font-size: 11px; color: var(--muted); word-break: break-all; }
+    
+    .badge {
+      display: inline-block; padding: 2px 6px; font-size: 10px; font-weight: bold;
+      text-transform: uppercase; border: 1px solid currentColor;
+    }
+    .badge.good { color: var(--good); }
+    .badge.warn { color: var(--warn); }
+    .badge.danger { color: var(--danger); }
+
+    button {
+      background: var(--accent); color: #000; border: none; padding: 6px 12px;
+      font-family: inherit; font-size: 11px; font-weight: bold; cursor: pointer;
+      text-transform: uppercase;
+    }
+    button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+    button:disabled { opacity: 0.5; cursor: default; }
+    
+    textarea, input[type="password"], input[type="file"] {
+      width: 100%; background: #000; border: 1px solid var(--border); color: var(--text);
+      padding: 8px; font-family: inherit; font-size: 12px;
+    }
+    textarea { min-height: 120px; }
+    
+    dialog {
+      background: var(--panel); border: 2px solid var(--accent); color: var(--text);
+      padding: 0; width: 600px; max-width: 90vw;
+    }
+    dialog::backdrop { background: rgba(0,0,0,0.8); backdrop-filter: blur(2px); }
+    .modal-content { padding: 20px; display: grid; gap: 16px; }
+    
+    .log-list { max-height: 400px; overflow-y: auto; font-size: 11px; }
+    .log-entry { padding: 4px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .log-entry.warn { color: var(--warn); background: rgba(255, 203, 99, 0.05); }
+    .log-entry.error { color: var(--danger); background: rgba(255, 116, 88, 0.05); }
+
+    .quota-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; }
+    .quota-box { border: 1px solid var(--border); padding: 8px; }
+    
+    @media (max-width: 1000px) {
+      .main-layout { grid-template-columns: 1fr; }
+      .grid-summary { grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="dashboard">
-      <div class="headerbar">
-        <div class="header-main">
-          <h1>${escapeHtml(options.serviceName)} Admin</h1>
-          <div class="header-subtitle">live status, auth, sessions, jobs.</div>
-        </div>
-        <div class="header-meta">
-            <div class="badge ${options.tokenConfigured ? "good" : "warn"}">${options.tokenConfigured ? "已启用管理员令牌" : "未启用管理员令牌"}</div>
-            <div class="badge">每 10 秒自动刷新</div>
-            <div class="badge">也可以手动刷新</div>
-        </div>
+    <header>
+      <h1>${escapeHtml(options.serviceName)} ADMIN</h1>
+      <div class="header-meta">
+        <span class="badge ${options.tokenConfigured ? "good" : "warn"}">${options.tokenConfigured ? "AUTH: ON" : "AUTH: OFF"}</span>
+        <span class="badge">REFRESH: 10S</span>
+      </div>
+    </header>
+
+    <div class="grid-summary">
+      <div class="summary-item">
+        <div class="summary-label">SERVICE</div>
+        <div class="summary-value" id="summary-service">--</div>
+        <div class="summary-detail" id="summary-service-detail">...</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">ACCOUNT</div>
+        <div class="summary-value" id="summary-account">--</div>
+        <div class="summary-detail" id="summary-account-detail">...</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">SESSIONS</div>
+        <div class="summary-value" id="summary-sessions">--</div>
+        <div class="summary-detail" id="summary-sessions-detail">...</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">JOBS</div>
+        <div class="summary-value" id="summary-jobs">--</div>
+        <div class="summary-detail" id="summary-jobs-detail">...</div>
+      </div>
+    </div>
+
+    <div class="main-layout">
+      <div class="stack-main">
+        <section>
+          <div class="section-head">
+            <div class="section-title">Sessions</div>
+            <div id="last-refresh" style="font-size:10px; color:var(--muted)">READY</div>
+          </div>
+          <div class="toolbar">
+            <input id="session-search" type="search" placeholder="FILTER SESSIONS..." />
+            <select id="session-filter">
+              <option value="all">ALL</option>
+              <option value="active">ACTIVE</option>
+              <option value="inbound">INBOUND</option>
+              <option value="jobs">JOBS</option>
+              <option value="issues">ISSUES</option>
+            </select>
+          </div>
+          <div class="session-table-header">
+            <div>Session Key / Channel</div>
+            <div>Status / Slack</div>
+            <div>Inbound / Jobs</div>
+            <div>Current Lead</div>
+            <div>Action</div>
+          </div>
+          <div id="sessions-panel" class="session-list"></div>
+        </section>
+
+        <section>
+          <div class="section-head">
+            <div class="section-title">System Logs</div>
+          </div>
+          <div id="logs-panel" class="log-list"></div>
+        </section>
       </div>
 
-      <section class="summary-strip">
-        <div class="summary-pill">
-          <div class="summary-pill-label">服务</div>
-          <div class="summary-pill-value" id="summary-service">--</div>
-          <div class="summary-pill-detail" id="summary-service-detail">正在读取服务信息…</div>
-        </div>
-        <div class="summary-pill">
-          <div class="summary-pill-label">账号</div>
-          <div class="summary-pill-value" id="summary-account">--</div>
-          <div class="summary-pill-detail" id="summary-account-detail">正在读取账号信息…</div>
-        </div>
-        <div class="summary-pill">
-          <div class="summary-pill-label">会话</div>
-          <div class="summary-pill-value" id="summary-sessions">--</div>
-          <div class="summary-pill-detail" id="summary-sessions-detail">正在读取会话状态…</div>
-        </div>
-        <div class="summary-pill">
-          <div class="summary-pill-label">任务</div>
-          <div class="summary-pill-value" id="summary-jobs">--</div>
-          <div class="summary-pill-detail" id="summary-jobs-detail">正在读取后台任务…</div>
-        </div>
-      </section>
-
-      <div class="layout">
-        <div class="main-stack">
-          <section class="card">
-            <div class="section-head">
-              <h2>会话状态</h2>
-              <div class="session-toolbar">
-                <input id="session-search" type="search" placeholder="搜索 session key / channel / workspace / snippet" />
-                <select id="session-filter">
-                  <option value="all">全部</option>
-                  <option value="active">只看 active</option>
-                  <option value="inbound">只看有待处理消息</option>
-                  <option value="jobs">只看有运行中任务</option>
-                  <option value="issues">只看有失败任务</option>
-                </select>
-              </div>
-            </div>
-            <div id="sessions-panel" class="list"></div>
-          </section>
-
-          <section class="card">
-            <div class="section-head">
-              <h2>最近日志</h2>
-              <div class="tiny mono">broker / recovery / turn</div>
-            </div>
-            <div id="logs-panel" class="log-list"></div>
-          </section>
-        </div>
-
-        <aside class="side-stack">
-          <section class="card">
-            <div class="section-head">
-              <h2>运行概览</h2>
-              <div class="toolbar-strip">
-                <input
-                  id="token-input"
-                  class="toolbar-grow"
-                  type="password"
-                  placeholder="${options.tokenConfigured ? "管理员令牌" : "当前可留空"}"
-                />
-                <button id="refresh-button" class="secondary">刷新</button>
-              </div>
-            </div>
-            <div class="status-line" id="token-status"></div>
-            <div class="tiny" id="last-refresh">还没有刷新</div>
-          </section>
-
-          <div class="overview-stack">
-            <section class="subpanel">
-              <div class="subpanel-head">
-                <div class="subpanel-title">服务</div>
-                <div class="tiny mono">runtime</div>
-              </div>
-              <div id="service-card"></div>
-            </section>
-
-            <section class="subpanel">
-              <div class="subpanel-head">
-                <div class="subpanel-title">账号</div>
-                <div class="tiny mono">account</div>
-              </div>
-              <div id="account-card"></div>
-            </section>
-
-            <section class="subpanel">
-              <div class="subpanel-head">
-                <div class="subpanel-title">登录文件</div>
-                <div class="tiny mono">auth / mcp / config</div>
-              </div>
-              <div class="auth-file-list">
-                <div class="auth-file-row">
-                  <div class="auth-file-main">
-                    <div class="auth-file-head">
-                      <div class="auth-file-title-group">
-                        <div class="auth-file-title mono">auth.json</div>
-                        <div class="auth-file-tag">常用</div>
-                      </div>
-                      <div id="auth-file-auth-badge"></div>
-                    </div>
-                    <div class="auth-file-meta" id="auth-file-auth-meta"></div>
-                    <div class="auth-file-path mono" id="auth-file-auth-path"></div>
-                  </div>
-                  <div class="auth-file-actions">
-                    <button id="open-auth-dialog">替换</button>
-                  </div>
-                </div>
-
-                <div class="auth-file-row">
-                  <div class="auth-file-main">
-                    <div class="auth-file-head">
-                      <div class="auth-file-title-group">
-                        <div class="auth-file-title mono">.credentials.json</div>
-                        <div class="auth-file-tag">MCP</div>
-                      </div>
-                      <div id="auth-file-credentials-badge"></div>
-                    </div>
-                    <div class="auth-file-meta" id="auth-file-credentials-meta"></div>
-                    <div class="auth-file-path mono" id="auth-file-credentials-path"></div>
-                  </div>
-                  <div class="auth-file-actions">
-                    <button id="open-credentials-dialog" class="secondary">替换</button>
-                  </div>
-                </div>
-
-                <div class="auth-file-row">
-                  <div class="auth-file-main">
-                    <div class="auth-file-head">
-                      <div class="auth-file-title-group">
-                        <div class="auth-file-title mono">config.toml</div>
-                        <div class="auth-file-tag">配置</div>
-                      </div>
-                      <div id="auth-file-config-badge"></div>
-                    </div>
-                    <div class="auth-file-meta" id="auth-file-config-meta"></div>
-                    <div class="auth-file-path mono" id="auth-file-config-path"></div>
-                  </div>
-                  <div class="auth-file-actions">
-                    <button id="open-config-dialog" class="secondary">替换</button>
-                  </div>
-                </div>
-              </div>
-              <div class="status-line" id="replace-status"></div>
-            </section>
+      <div class="stack-side">
+        <section>
+          <div class="section-head">
+            <div class="section-title">Control</div>
           </div>
-        </aside>
+          <div style="padding:12px; display:grid; gap:8px;">
+            <input id="token-input" type="password" placeholder="ADMIN TOKEN" />
+            <button id="refresh-button">REFRESH STATUS</button>
+            <div id="token-status" style="font-size:10px; text-align:center"></div>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-head">
+            <div class="section-title">Account Quota</div>
+          </div>
+          <div id="account-card"></div>
+        </section>
+
+        <section>
+          <div class="section-head">
+            <div class="section-title">Auth Files</div>
+          </div>
+          <div id="auth-files-list">
+            <div class="auth-row">
+              <div class="auth-info">
+                <div style="font-weight:bold">auth.json <span id="auth-file-auth-badge"></span></div>
+                <div class="auth-path" id="auth-file-auth-path"></div>
+                <div class="auth-path" id="auth-file-auth-meta"></div>
+              </div>
+              <button id="open-auth-dialog">REPLACE</button>
+            </div>
+            <div class="auth-row">
+              <div class="auth-info">
+                <div style="font-weight:bold">.credentials.json <span id="auth-file-credentials-badge"></span></div>
+                <div class="auth-path" id="auth-file-credentials-path"></div>
+                <div class="auth-path" id="auth-file-credentials-meta"></div>
+              </div>
+              <button id="open-credentials-dialog" class="secondary">REPLACE</button>
+            </div>
+            <div class="auth-row">
+              <div class="auth-info">
+                <div style="font-weight:bold">config.toml <span id="auth-file-config-badge"></span></div>
+                <div class="auth-path" id="auth-file-config-path"></div>
+                <div class="auth-path" id="auth-file-config-meta"></div>
+              </div>
+              <button id="open-config-dialog" class="secondary">REPLACE</button>
+            </div>
+          </div>
+          <div id="replace-status" style="padding:8px; font-size:10px;"></div>
+        </section>
+
+        <section>
+          <div class="section-head">
+            <div class="section-title">Runtime Info</div>
+          </div>
+          <div id="service-card" style="padding:12px; font-size:11px;"></div>
+        </section>
       </div>
     </div>
   </div>
 
-  <dialog id="auth-dialog" class="admin-modal">
-    <div class="modal-card">
-      <div class="modal-head">
-        <div>
-          <h2>替换 auth.json</h2>
-          <div class="modal-copy">只改运行账号。你可以上传文件，或者直接粘贴完整的 <span class="mono">auth.json</span>。如果两者都提供，优先使用粘贴内容。</div>
-        </div>
-        <button id="close-auth-dialog" class="secondary" type="button">关闭</button>
-      </div>
-      <div class="stack">
-        <label>
-          auth.json 文件
-          <input id="auth-json-file" type="file" accept=".json,application/json" />
-        </label>
-        <label>
-          或者直接粘贴 auth.json
-          <textarea id="auth-json-text" placeholder='把完整 auth.json 粘贴到这里。'></textarea>
-        </label>
-        <label class="checkbox">
-          <input id="allow-active-auth" type="checkbox" />
-          即使当前有活跃 session，也允许替换并打断它们
-        </label>
-      </div>
-      <div class="modal-actions">
-        <button id="submit-auth-dialog">应用 auth.json</button>
-      </div>
-      <div class="status-line" id="auth-dialog-status"></div>
+  <dialog id="auth-dialog"><div class="modal-content">
+    <div class="section-title">Replace auth.json</div>
+    <input id="auth-json-file" type="file" />
+    <textarea id="auth-json-text" placeholder="PASTE JSON HERE..."></textarea>
+    <label style="font-size:11px; display:flex; gap:8px; align-items:center;">
+      <input id="allow-active-auth" type="checkbox" /> FORCE REPLACE (INTERRUPT SESSIONS)
+    </label>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button id="close-auth-dialog" class="secondary">CANCEL</button>
+      <button id="submit-auth-dialog">APPLY</button>
     </div>
-  </dialog>
+    <div id="auth-dialog-status" style="font-size:10px;"></div>
+  </div></dialog>
 
-  <dialog id="credentials-dialog" class="admin-modal">
-    <div class="modal-card">
-      <div class="modal-head">
-        <div>
-          <h2>替换 .credentials.json</h2>
-          <div class="modal-copy">只改 MCP OAuth 凭据。支持上传文件，也支持直接粘贴完整 JSON。</div>
-        </div>
-        <button id="close-credentials-dialog" class="secondary" type="button">关闭</button>
-      </div>
-      <div class="stack">
-        <label>
-          .credentials.json 文件
-          <input id="credentials-json-file" type="file" accept=".json,application/json" />
-        </label>
-        <label>
-          或者直接粘贴 .credentials.json
-          <textarea id="credentials-json-text" placeholder='把完整 .credentials.json 粘贴到这里。'></textarea>
-        </label>
-        <label class="checkbox">
-          <input id="allow-active-credentials" type="checkbox" />
-          即使当前有活跃 session，也允许替换并打断它们
-        </label>
-      </div>
-      <div class="modal-actions">
-        <button id="submit-credentials-dialog">应用 .credentials.json</button>
-      </div>
-      <div class="status-line" id="credentials-dialog-status"></div>
+  <dialog id="credentials-dialog"><div class="modal-content">
+    <div class="section-title">Replace .credentials.json</div>
+    <input id="credentials-json-file" type="file" />
+    <textarea id="credentials-json-text" placeholder="PASTE JSON HERE..."></textarea>
+    <label style="font-size:11px; display:flex; gap:8px; align-items:center;">
+      <input id="allow-active-credentials" type="checkbox" /> FORCE REPLACE
+    </label>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button id="close-credentials-dialog" class="secondary">CANCEL</button>
+      <button id="submit-credentials-dialog">APPLY</button>
     </div>
-  </dialog>
+    <div id="credentials-dialog-status" style="font-size:10px;"></div>
+  </div></dialog>
 
-  <dialog id="config-dialog" class="admin-modal">
-    <div class="modal-card">
-      <div class="modal-head">
-        <div>
-          <h2>替换 config.toml</h2>
-          <div class="modal-copy">只改运行配置。支持上传文件，也支持直接粘贴完整文本。</div>
-        </div>
-        <button id="close-config-dialog" class="secondary" type="button">关闭</button>
-      </div>
-      <div class="stack">
-        <label>
-          config.toml 文件
-          <input id="config-toml-file" type="file" accept=".toml,text/plain" />
-        </label>
-        <label>
-          或者直接粘贴 config.toml
-          <textarea id="config-toml-text" placeholder='把完整 config.toml 粘贴到这里。'></textarea>
-        </label>
-        <label class="checkbox">
-          <input id="allow-active-config" type="checkbox" />
-          即使当前有活跃 session，也允许替换并打断它们
-        </label>
-      </div>
-      <div class="modal-actions">
-        <button id="submit-config-dialog">应用 config.toml</button>
-      </div>
-      <div class="status-line" id="config-dialog-status"></div>
+  <dialog id="config-dialog"><div class="modal-content">
+    <div class="section-title">Replace config.toml</div>
+    <input id="config-toml-file" type="file" />
+    <textarea id="config-toml-text" placeholder="PASTE TOML HERE..."></textarea>
+    <label style="font-size:11px; display:flex; gap:8px; align-items:center;">
+      <input id="allow-active-config" type="checkbox" /> FORCE REPLACE
+    </label>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button id="close-config-dialog" class="secondary">CANCEL</button>
+      <button id="submit-config-dialog">APPLY</button>
     </div>
-  </dialog>
+    <div id="config-dialog-status" style="font-size:10px;"></div>
+  </div></dialog>
 
   <script>
     const tokenKey = "broker-admin-token";
@@ -1003,9 +468,6 @@ function renderAdminPage(options: {
     const lastRefresh = document.getElementById("last-refresh");
     const sessionSearch = document.getElementById("session-search");
     const sessionFilter = document.getElementById("session-filter");
-    const authJsonText = document.getElementById("auth-json-text");
-    const credentialsJsonText = document.getElementById("credentials-json-text");
-    const configTomlText = document.getElementById("config-toml-text");
     let latestStatus = null;
     const dialogs = [
       ["auth-dialog", "open-auth-dialog", "close-auth-dialog"],
@@ -1016,129 +478,79 @@ function renderAdminPage(options: {
     tokenInput.value = localStorage.getItem(tokenKey) || "";
 
     function esc(value) {
-      return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#39;");
+      return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
     }
 
     function fmtTime(value) {
       if (!value) return "—";
-      try {
-        return new Date(value).toLocaleString();
-      } catch {
-        return String(value);
-      }
+      try { return new Date(value).toLocaleTimeString(); } catch { return String(value); }
     }
 
     function clampPercent(value) {
       const number = Number(value);
-      if (!Number.isFinite(number)) return 0;
-      return Math.max(0, Math.min(100, Math.round(number)));
+      return Math.max(0, Math.min(100, Math.round(number || 0)));
     }
 
-    function formatWindowLabel(windowDurationMins) {
-      const mins = Number(windowDurationMins);
-      if (!Number.isFinite(mins) || mins <= 0) {
-        return "window unknown";
-      }
-      if (mins === 300) {
-        return "5h";
-      }
-      if (mins === 10080) {
-        return "weekly";
-      }
-      if (mins % 1440 === 0) {
-        return String(mins / 1440) + "d";
-      }
-      if (mins % 60 === 0) {
-        return String(mins / 60) + "h";
-      }
-      return String(mins) + "m";
+    function formatWindowLabel(mins) {
+      const m = Number(mins);
+      if (m === 300) return "5h";
+      if (m === 10080) return "weekly";
+      if (m % 1440 === 0) return (m/1440) + "d";
+      if (m % 60 === 0) return (m/60) + "h";
+      return m + "m";
     }
 
     function formatRelativeDuration(ms) {
       const absMs = Math.abs(ms);
-      const totalMinutes = Math.round(absMs / 60000);
-      if (totalMinutes < 1) {
-        return "under 1m";
-      }
-      if (totalMinutes < 60) {
-        return totalMinutes + "m";
-      }
-      const totalHours = Math.round(absMs / 3600000);
-      if (totalHours < 48) {
-        return totalHours + "h";
-      }
-      const totalDays = Math.round(absMs / 86400000);
-      return totalDays + "d";
+      const m = Math.round(absMs / 60000);
+      if (m < 60) return m + "m";
+      const h = Math.round(absMs / 3600000);
+      if (h < 48) return h + "h";
+      return Math.round(absMs / 86400000) + "d";
     }
 
-    function formatResetTime(resetsAtSeconds) {
-      if (resetsAtSeconds == null) {
-        return "reset unknown";
-      }
-
-      const resetMs = Number(resetsAtSeconds) * 1000;
-      if (!Number.isFinite(resetMs)) {
-        return "reset " + String(resetsAtSeconds);
-      }
-
-      const delta = resetMs - Date.now();
-      if (Math.abs(delta) < 30000) {
-        return "just reset";
-      }
-
-      const relative = formatRelativeDuration(delta);
-      const exact = fmtTime(resetMs);
-      return delta > 0 ? ("resets in " + relative + " · " + exact) : ("reset " + relative + " ago · " + exact);
+    function formatResetTime(sec) {
+      if (sec == null) return "unknown reset";
+      const delta = (Number(sec) * 1000) - Date.now();
+      const rel = formatRelativeDuration(delta);
+      return delta > 0 ? "in " + rel : rel + " ago";
     }
 
-    function fmtDuration(totalSeconds) {
-      const seconds = Number(totalSeconds || 0);
-      if (!Number.isFinite(seconds) || seconds <= 0) return "刚启动";
-      const parts = [];
-      const hours = Math.floor(seconds / 3600);
-      const minutes = Math.floor((seconds % 3600) / 60);
-      const remainingSeconds = seconds % 60;
-      if (hours > 0) parts.push(hours + " 小时");
-      if (minutes > 0) parts.push(minutes + " 分钟");
-      if (hours === 0 && remainingSeconds > 0) parts.push(remainingSeconds + " 秒");
-      return parts.join(" ");
+    function fmtDuration(sec) {
+      const s = Number(sec || 0);
+      if (s <= 0) return "JUST STARTED";
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      return (h > 0 ? h + "h " : "") + m + "m";
     }
 
     function statusTone(status) {
-      const value = String(status || "").toLowerCase();
-      if (["running", "active", "ok", "completed"].includes(value)) return "good";
-      if (["pending", "inflight", "starting", "cancelled"].includes(value)) return "warn";
-      if (["failed", "error", "stopped"].includes(value)) return "danger";
+      const v = String(status || "").toLowerCase();
+      if (["running", "active", "ok", "completed"].includes(v)) return "good";
+      if (["pending", "inflight", "starting"].includes(v)) return "warn";
+      if (["failed", "error", "stopped"].includes(v)) return "danger";
       return "";
     }
 
     function renderBadge(label, tone) {
-      const cls = tone ? "badge " + tone : "badge";
-      return '<span class="' + cls + '">' + esc(label) + "</span>";
+      return '<span class="badge ' + (tone || "") + '">' + esc(label) + "</span>";
     }
 
     function authHeaders(extra) {
-      const headers = Object.assign({}, extra || {});
-      const token = tokenInput.value.trim();
-      if (token) {
-        headers["x-admin-token"] = token;
-      }
-      return headers;
+      const h = Object.assign({}, extra || {});
+      const t = tokenInput.value.trim();
+      if (t) h["x-admin-token"] = t;
+      return h;
     }
 
     function persistToken() {
       localStorage.setItem(tokenKey, tokenInput.value.trim());
       if (tokenConfigured && !tokenInput.value.trim()) {
-        tokenStatus.innerHTML = '<span class="warn">缺少管理员令牌</span>';
+        tokenStatus.innerHTML = '<span style="color:var(--warn)">MISSING TOKEN</span>';
       } else if (!tokenConfigured) {
-        tokenStatus.innerHTML = '<span class="warn">管理员接口未设防</span>';
+        tokenStatus.innerHTML = '<span style="color:var(--warn)">UNPROTECTED</span>';
       } else {
-        tokenStatus.innerHTML = '<span class="good">管理员令牌已就绪</span>';
+        tokenStatus.innerHTML = '<span style="color:var(--good)">TOKEN READY</span>';
       }
     }
 
@@ -1146,404 +558,158 @@ function renderAdminPage(options: {
     persistToken();
 
     function renderSummary(data) {
-      const service = data.service || {};
-      const state = data.state || {};
-      const account = data.account || {};
-      const rateLimits = data.rateLimits || {};
-      const runningJobs = Number(state.runningBackgroundJobCount || 0);
-      const failedJobs = Number(state.failedBackgroundJobCount || 0);
-
-      document.getElementById("summary-service").textContent = "在线";
-      document.getElementById("summary-service-detail").textContent =
-        "PID " + (service.pid || "—") + "，已运行 " + fmtDuration(service.uptimeSeconds || 0) + "。";
-
-      const accountLabel = account.ok ? ((account.account && account.account.planType) || "已登录") : "异常";
-      document.getElementById("summary-account").textContent = accountLabel;
-      document.getElementById("summary-account-detail").textContent = account.ok
-        ? (
-            ((account.account && account.account.email) || "未提供邮箱") +
-            " · " +
-            ((account.account && account.account.type) || "未知类型") +
-            " · " +
-            summarizeRateLimits(rateLimits)
-          )
-        : ("账号读取失败：" + (account.error || "unknown error"));
-
-      document.getElementById("summary-sessions").textContent =
-        String(state.activeCount || 0) + " / " + String(state.sessionCount || 0);
-      document.getElementById("summary-sessions-detail").textContent =
-        "活跃 / 总会话，待处理 " + String(state.openInboundCount || 0) + "。";
-
-      document.getElementById("summary-jobs").textContent = String(runningJobs);
-      document.getElementById("summary-jobs-detail").textContent =
-        "运行中任务，失败 " + String(failedJobs) + "。";
+      const s = data.service || {};
+      const st = data.state || {};
+      const a = data.account || {};
+      const rl = data.rateLimits || {};
+      
+      document.getElementById("summary-service").textContent = "ONLINE";
+      document.getElementById("summary-service-detail").textContent = "PID " + (s.pid || "-") + " · UP " + fmtDuration(s.uptimeSeconds);
+      
+      document.getElementById("summary-account").textContent = a.ok ? (a.account?.planType || "LOGGED") : "ERROR";
+      document.getElementById("summary-account-detail").textContent = a.ok ? (a.account?.email || "NO EMAIL") : (a.error || "ERR");
+      
+      document.getElementById("summary-sessions").textContent = (st.activeCount || 0) + "/" + (st.sessionCount || 0);
+      document.getElementById("summary-sessions-detail").textContent = "INBOUND: " + (st.openInboundCount || 0);
+      
+      document.getElementById("summary-jobs").textContent = st.runningBackgroundJobCount || 0;
+      document.getElementById("summary-jobs-detail").textContent = "FAILED: " + (st.failedBackgroundJobCount || 0);
     }
 
     function renderService(data) {
-      const card = document.getElementById("service-card");
-      const service = data.service || {};
-      card.innerHTML =
-        '<div class="compact-kv">' +
-          [
-            ["服务名", esc(service.name || "—")],
-            ["PID", esc(service.pid || "—")],
-            ["运行时长", esc(fmtDuration(service.uptimeSeconds || 0))],
-            ["端口", esc(service.port || "—")],
-            ["启动时间", esc(fmtTime(service.startedAt))],
-            ["管理员令牌", service.adminTokenConfigured ? "已配置" : "未配置"]
-          ].map(([k, v]) =>
-            '<div class="compact-stat"><div class="compact-stat-label">' + k + '</div><div class="compact-stat-value">' + v + "</div></div>"
-          ).join("") +
-        '</div>' +
-        '<div class="list">' +
-          [
-            ["会话目录", service.sessionsRoot || "—"],
-            ["仓库目录", service.reposRoot || "—"],
-            ["Codex Home", service.codexHome || "—"]
-          ].map(([k, v]) =>
-            '<div class="item"><div class="item-head"><div class="item-title">' + esc(k) + '</div></div><div class="hint mono">' + esc(v) + "</div></div>"
-          ).join("") +
+      const s = data.service || {};
+      document.getElementById("service-card").innerHTML = 
+        '<div style="display:grid; gap:4px;">' +
+        '<div>NAME: ' + esc(s.name) + '</div>' +
+        '<div>PORT: ' + esc(s.port) + '</div>' +
+        '<div>START: ' + esc(new Date(s.startedAt).toLocaleString()) + '</div>' +
+        '<div style="margin-top:8px; color:var(--muted); font-size:10px;">ROOTS:</div>' +
+        '<div style="word-break:break-all;">' + esc(s.sessionsRoot) + '</div>' +
         '</div>';
-    }
-
-    function formatRateLimitWindow(window) {
-      if (!window) {
-        return "—";
-      }
-
-      const parts = [formatWindowLabel(window.windowDurationMins)];
-      const remaining = formatRemainingPercent(window);
-      if (remaining !== "—") {
-        parts.push(remaining);
-      }
-      parts.push(formatResetTime(window.resetsAt));
-      return parts.join(" · ");
-    }
-
-    function formatRemainingPercent(window) {
-      if (!window) {
-        return "—";
-      }
-
-      const usedPercent = clampPercent(window.usedPercent);
-      const remainingPercent = Math.max(0, 100 - usedPercent);
-      return String(remainingPercent) + "% left";
-    }
-
-    function formatCreditsSnapshot(credits) {
-      if (!credits) {
-        return "—";
-      }
-
-      const parts = [credits.unlimited ? "unlimited" : credits.hasCredits ? "has credits" : "no credits"];
-      if (credits.balance != null) {
-        parts.push("balance " + credits.balance);
-      }
-      return parts.join(" · ");
-    }
-
-    function summarizeRateLimits(rateLimits) {
-      if (!rateLimits || !rateLimits.ok) {
-        return rateLimits && rateLimits.error ? "额度读取失败：" + rateLimits.error : "额度不可用";
-      }
-
-      const snapshot = rateLimits.rateLimits || {};
-      const parts = [];
-      if (snapshot.planType) {
-        parts.push(String(snapshot.planType));
-      }
-      if (snapshot.limitName || snapshot.limitId) {
-        parts.push([snapshot.limitName, snapshot.limitId].filter(Boolean).join(" / "));
-      }
-      const primary = formatRateLimitWindow(snapshot.primary);
-      if (primary !== "—") {
-        parts.push("主 " + primary);
-      }
-      const credits = formatCreditsSnapshot(snapshot.credits);
-      if (credits !== "—") {
-        parts.push("credits " + credits);
-      }
-      return parts.length > 0 ? parts.join(" · ") : "额度已读取";
-    }
-
-    function renderRateLimitBucket(snapshot, key) {
-      const label = [snapshot.limitName, snapshot.limitId || key].filter(Boolean).join(" / ") || key;
-      const primary = formatRateLimitWindow(snapshot.primary);
-      const secondary = formatRateLimitWindow(snapshot.secondary);
-      const credits = formatCreditsSnapshot(snapshot.credits);
-      return [
-        '<div class="item">',
-          '<div class="item-head">',
-            '<div class="item-title mono">' + esc(label) + '</div>',
-            renderBadge(snapshot.planType || "unknown", "good") +
-          '</div>',
-          '<div class="meta">' +
-            '<span>主：' + esc(primary) + '</span>' +
-            '<span>副：' + esc(secondary) + '</span>' +
-            '<span>credits：' + esc(credits) + '</span>' +
-          '</div>',
-        '</div>'
-      ].join("");
     }
 
     function renderAccount(data) {
       const panel = document.getElementById("account-card");
-      const account = data.account || {};
-      if (!account.ok) {
-        panel.innerHTML = '<div class="item danger"><div class="item-title">账号读取失败</div><div class="item-text">' + esc(account.error || "unknown error") + "</div></div>";
+      const a = data.account || {};
+      if (!a.ok) {
+        panel.innerHTML = '<div style="padding:12px; color:var(--danger)">' + esc(a.error || "ACCOUNT ERR") + '</div>';
         return;
       }
+      const rl = data.rateLimits || {};
+      const snap = rl.ok ? rl.rateLimits : null;
+      
+      let html = '<div style="padding:12px; border-bottom:1px solid var(--border);">';
+      html += '<div>' + esc(a.account?.email) + '</div>';
+      html += '<div style="font-size:11px; color:var(--muted)">' + esc(a.account?.planType) + ' · ' + esc(a.account?.type) + '</div>';
+      html += '</div>';
 
-      const summary = account.account || {};
-      const rateLimits = data.rateLimits || {};
-      const rateLimitSnapshot = rateLimits.ok ? (rateLimits.rateLimits || null) : null;
-      const rateLimitBuckets = rateLimits.ok && rateLimits.rateLimitsByLimitId ? Object.entries(rateLimits.rateLimitsByLimitId) : [];
-      const extraRateLimitBuckets = rateLimitBuckets.filter(([key]) => !rateLimitSnapshot || key !== rateLimitSnapshot.limitId);
-      panel.innerHTML = [
-        '<div class="compact-kv">' +
-          [
-            ["套餐", summary.planType || "unknown"],
-            ["类型", summary.type || "—"],
-            ["邮箱", summary.email || "—"],
-            ["额度", rateLimits.ok ? "已提供" : "未提供"]
-          ].map(([k, v]) =>
-            '<div class="compact-stat"><div class="compact-stat-label">' + esc(k) + '</div><div class="compact-stat-value">' + esc(v) + "</div></div>"
-          ).join("") +
-        '</div>',
-        '<div class="item">' +
-          '<div class="item-head">' +
-            '<div class="item-title">额度 / credits</div>' +
-            '<div class="tiny mono">account/rateLimits/read</div>' +
-          '</div>' +
-          (rateLimits.ok && rateLimitSnapshot
-            ? [
-                '<div class="list">' +
-                  [
-                    rateLimitSnapshot.primary
-                      ? '<div class="item">' +
-                          '<div class="item-head">' +
-                            '<div class="item-title">' + esc(formatWindowLabel(rateLimitSnapshot.primary.windowDurationMins)) + '</div>' +
-                            renderBadge(formatRemainingPercent(rateLimitSnapshot.primary), "good") +
-                          '</div>' +
-                          '<div class="meta"><span>' + esc(formatResetTime(rateLimitSnapshot.primary.resetsAt)) + '</span></div>' +
-                        '</div>'
-                      : "",
-                    rateLimitSnapshot.secondary
-                      ? '<div class="item">' +
-                          '<div class="item-head">' +
-                            '<div class="item-title">' + esc(formatWindowLabel(rateLimitSnapshot.secondary.windowDurationMins)) + '</div>' +
-                            renderBadge(formatRemainingPercent(rateLimitSnapshot.secondary), "good") +
-                          '</div>' +
-                          '<div class="meta"><span>' + esc(formatResetTime(rateLimitSnapshot.secondary.resetsAt)) + '</span></div>' +
-                        '</div>'
-                      : ""
-                  ].filter(Boolean).join("") +
-                '</div>' +
-                '<div class="compact-kv">' +
-                  [
-                    ["额度桶", [rateLimitSnapshot.limitName, rateLimitSnapshot.limitId].filter(Boolean).join(" / ") || "—"],
-                    ["计划", rateLimitSnapshot.planType || "—"],
-                    ["credits", formatCreditsSnapshot(rateLimitSnapshot.credits)],
-                    ["限额桶", String(rateLimitBuckets.length || 1)]
-                  ].map(([k, v]) =>
-                    '<div class="compact-stat"><div class="compact-stat-label">' + esc(k) + '</div><div class="compact-stat-value">' + esc(v) + "</div></div>"
-                  ).join("") +
-                '</div>' +
-                (extraRateLimitBuckets.length
-                  ? '<div class="list">' + extraRateLimitBuckets.map(([key, snapshot]) => renderRateLimitBucket(snapshot, key)).join("") + '</div>'
-                  : "")
-              ].join("")
-            : '<div class="item-text muted">' + esc(rateLimits.error || "当前接口没有返回 rateLimits。") + "</div>"
-          ) +
-        '</div>'
-      ].join("");
+      if (snap) {
+        html += '<div class="quota-grid">';
+        if (snap.primary) {
+          html += '<div class="quota-box"><div class="summary-label">' + formatWindowLabel(snap.primary.windowDurationMins) + '</div>' +
+                  '<div>' + (100 - clampPercent(snap.primary.usedPercent)) + '% LEFT</div>' +
+                  '<div style="font-size:9px; color:var(--muted)">RESET ' + formatResetTime(snap.primary.resetsAt) + '</div></div>';
+        }
+        if (snap.secondary) {
+          html += '<div class="quota-box"><div class="summary-label">' + formatWindowLabel(snap.secondary.windowDurationMins) + '</div>' +
+                  '<div>' + (100 - clampPercent(snap.secondary.usedPercent)) + '% LEFT</div>' +
+                  '<div style="font-size:9px; color:var(--muted)">RESET ' + formatResetTime(snap.secondary.resetsAt) + '</div></div>';
+        }
+        html += '</div>';
+        if (snap.credits) {
+          html += '<div style="padding:0 12px 12px; font-size:11px; color:var(--muted)">CREDITS: ' + 
+                  (snap.credits.unlimited ? "UNLIMITED" : (snap.credits.balance || "0")) + '</div>';
+        }
+      } else {
+        html += '<div style="padding:12px; font-size:11px; color:var(--muted)">' + (rl.error || "NO QUOTA DATA") + '</div>';
+      }
+      panel.innerHTML = html;
     }
 
     function renderAuthFiles(data) {
-      const entries = [
-        ["auth", data.authFiles.authJson],
-        ["credentials", data.authFiles.credentialsJson],
-        ["config", data.authFiles.configToml]
-      ];
-      entries.forEach(([key, file]) => {
-        const badgeNode = document.getElementById("auth-file-" + key + "-badge");
-        const metaNode = document.getElementById("auth-file-" + key + "-meta");
-        const pathNode = document.getElementById("auth-file-" + key + "-path");
-        badgeNode.innerHTML = renderBadge(file.exists ? "已就位" : "缺失", file.exists ? "good" : "warn");
-        metaNode.innerHTML = file.exists
-          ? '<span>大小：' + esc(file.size) + ' bytes</span><span>更新时间：' + esc(fmtTime(file.mtime)) + "</span>"
-          : '<span class="warn">文件不存在</span>';
-        pathNode.textContent = file.path || "—";
-      });
+      const map = { auth: data.authFiles.authJson, credentials: data.authFiles.credentialsJson, config: data.authFiles.configToml };
+      for (const [k, f] of Object.entries(map)) {
+        document.getElementById("auth-file-" + k + "-badge").innerHTML = renderBadge(f.exists ? "OK" : "MISSING", f.exists ? "good" : "warn");
+        document.getElementById("auth-file-" + k + "-path").textContent = f.path || "-";
+        document.getElementById("auth-file-" + k + "-meta").textContent = f.exists ? (f.size + " bytes · " + fmtTime(f.mtime)) : "NOT FOUND";
+      }
     }
 
-    function summarizeSessionLead(session) {
-      const inbound = session.openInbound || [];
-      if (inbound.length > 0) {
-        return inbound.map((item) => item.textPreview).filter(Boolean)[0] || "有待处理消息";
+    function summarizeSessionLead(s) {
+      if (s.openInbound?.length) return s.openInbound[0].textPreview || "NEW MSG";
+      if (s.backgroundJobs?.length) {
+        const r = s.backgroundJobs.find(j => j.status === "running") || s.backgroundJobs[0];
+        return (r.kind || "JOB") + " (" + (r.status || "?") + ")";
       }
-      const jobs = session.backgroundJobs || [];
-      if (jobs.length > 0) {
-        const running = jobs.find((job) => job.status === "running") || jobs[0];
-        return (running.kind || "job") + " · " + (running.status || "unknown");
-      }
-      return "当前无待处理项";
-    }
-
-    function renderDenseInboundTable(inbound) {
-      if (!inbound.length) {
-        return '<div class="empty">没有待处理消息。</div>';
-      }
-      return '<table class="dense-table"><thead><tr><th>状态</th><th>来源</th><th>消息</th><th>更新时间</th></tr></thead><tbody>' +
-        inbound.map((item) =>
-          '<tr>' +
-            '<td>' + renderBadge(item.status || "unknown", statusTone(item.status)) + '</td>' +
-            '<td><span class="mono">' + esc(item.source || "—") + '</span></td>' +
-            '<td>' +
-              '<div class="mono tiny">' + esc(item.messageTs || "—") + '</div>' +
-              '<div>' + esc(item.textPreview || "—") + '</div>' +
-            '</td>' +
-            '<td>' + esc(fmtTime(item.updatedAt)) + '</td>' +
-          '</tr>'
-        ).join("") +
-      "</tbody></table>";
-    }
-
-    function renderDenseJobsTable(jobs, totals) {
-      if (!jobs.length) {
-        return '<div class="empty">没有关联后台任务。</div>';
-      }
-      return '<table class="dense-table"><thead><tr><th>状态</th><th>类型</th><th>CWD</th><th>更新时间</th></tr></thead><tbody>' +
-        jobs.map((job) =>
-          '<tr>' +
-            '<td>' + renderBadge(job.status || "unknown", statusTone(job.status)) + '</td>' +
-            '<td><span class="mono">' + esc(job.kind || "—") + '</span></td>' +
-            '<td>' +
-              '<div class="mono">' + esc(job.cwd || "—") + '</div>' +
-              (job.error ? '<div class="danger tiny" style="margin-top:4px;">' + esc(job.error) + '</div>' : "") +
-            '</td>' +
-            '<td>' + esc(fmtTime(job.updatedAt)) + '</td>' +
-          '</tr>'
-        ).join("") +
-      "</tbody></table>" +
-      (totals.total > jobs.length ? '<div class="hint">这里只显示最近 ' + esc(jobs.length) + ' 条，历史总数 ' + esc(totals.total) + '。</div>' : "");
+      return "IDLE";
     }
 
     function renderSessions(data) {
       const panel = document.getElementById("sessions-panel");
-      const state = data.state || {};
-      const allSessions = state.sessions || [];
-      const needle = (sessionSearch.value || "").trim().toLowerCase();
-      const mode = sessionFilter.value || "all";
-      const sessions = allSessions.filter((session) => {
-        const runningJobs = Number(session.runningBackgroundJobCount || 0);
-        const failedJobs = Number(session.failedBackgroundJobCount || 0);
-        const inboundCount = Number(session.openInboundCount || 0);
-        if (mode === "active" && !session.activeTurnId) return false;
-        if (mode === "inbound" && inboundCount === 0) return false;
-        if (mode === "jobs" && runningJobs === 0) return false;
-        if (mode === "issues" && failedJobs === 0) return false;
-        if (!needle) return true;
-        const haystack = [
-          session.key,
-          session.channelId,
-          session.rootThreadTs,
-          session.workspacePath,
-          summarizeSessionLead(session),
-          ...(session.openInbound || []).map((item) => item.textPreview || ""),
-          ...(session.backgroundJobs || []).map((job) => [job.kind, job.cwd, job.error].filter(Boolean).join(" "))
-        ].join("\\n").toLowerCase();
-        return haystack.includes(needle);
+      const list = data.state?.sessions || [];
+      const query = (sessionSearch.value || "").toLowerCase();
+      const mode = sessionFilter.value;
+      
+      const filtered = list.filter(s => {
+        if (mode === "active" && !s.activeTurnId) return false;
+        if (mode === "inbound" && !s.openInboundCount) return false;
+        if (mode === "jobs" && !s.runningBackgroundJobCount) return false;
+        if (mode === "issues" && !s.failedBackgroundJobCount) return false;
+        if (!query) return true;
+        return [s.key, s.channelId, s.workspacePath].some(v => String(v).toLowerCase().includes(query));
       });
-      const parts = [];
-      if (sessions.length > 0) {
-        parts.push(
-          sessions.map((session) => {
-            const jobs = session.backgroundJobs || [];
-            const inbound = session.openInbound || [];
-            const isActive = Boolean(session.activeTurnId);
-            const runningJobs = Number(session.runningBackgroundJobCount || 0);
-            const totalJobs = Number(session.backgroundJobCount || 0);
-            const failedJobs = Number(session.failedBackgroundJobCount || 0);
-            const turnBadge = isActive ? renderBadge("active", "good") : renderBadge("idle", "warn");
-            const lead = summarizeSessionLead(session);
-            return (
-            '<details class="session-shell">' +
-              '<summary class="session-summary">' +
-                '<div class="session-summary-top">' +
-                  '<div class="session-summary-main">' +
-                    '<div class="session-summary-title mono">' + esc(session.key || "—") + '</div>' +
-                    '<div class="session-summary-meta"><span>channel ' + esc(session.channelId || "—") + '</span><span>thread ' + esc(session.rootThreadTs || "—") + '</span></div>' +
-                  '</div>' +
-                  '<div class="session-summary-cell">' +
-                    '<div class="session-summary-label">最近状态</div>' +
-                    '<div class="session-summary-value">更新 ' + esc(fmtTime(session.updatedAt)) + '</div>' +
-                    '<div class="session-summary-value">回复 ' + esc(fmtTime(session.lastSlackReplyAt)) + '</div>' +
-                  '</div>' +
-                  '<div class="session-summary-cell">' +
-                    '<div class="session-summary-label">资源</div>' +
-                    '<div class="session-summary-value">待处理 ' + esc(session.openInboundCount || 0) + ' · 运行中任务 ' + esc(runningJobs) + ' · 总任务 ' + esc(totalJobs) + '</div>' +
-                    '<div class="session-summary-value">失败任务 ' + esc(failedJobs) + '</div>' +
-                  '</div>' +
-                  '<div class="session-summary-cell">' +
-                    '<div class="session-summary-label">当前线索</div>' +
-                    '<div class="session-summary-value truncate">' + esc(lead) + '</div>' +
-                  '</div>' +
-                  '<div class="session-summary-side">' +
-                    turnBadge +
-                    '<div class="tiny mono">' + esc(session.workspacePath || "—") + '</div>' +
-                  '</div>' +
-                '</div>' +
-                '<div class="session-counts">' +
-                  renderBadge("待处理 " + esc(session.openInboundCount || 0), Number(session.openInboundCount || 0) > 0 ? "warn" : "") +
-                  renderBadge("运行中任务 " + esc(runningJobs), runningJobs > 0 ? "good" : "") +
-                  renderBadge("总任务 " + esc(totalJobs), totalJobs > 0 ? "warn" : "") +
-                  (failedJobs > 0 ? renderBadge("失败 " + esc(failedJobs), "danger") : "") +
-                  (session.activeTurnId ? renderBadge("turn 已占用", "good") : renderBadge("当前空闲", "warn")) +
-                '</div>' +
-              '</summary>' +
-              '<div class="session-body">' +
-                '<div class="session-divider"></div>' +
-                '<div class="meta"><span>工作目录：<span class="mono">' + esc(session.workspacePath || "—") + '</span></span>' +
-                (session.activeTurnId ? '<span>turn：<span class="mono">' + esc(session.activeTurnId) + '</span></span>' : "") +
-                '</div>' +
-                '<div class="session-detail-grid">' +
-                  '<div class="subpanel">' +
-                    '<div class="subpanel-head"><div class="subpanel-title">待处理消息</div><div class="subpanel-meta">当前 ' + esc(inbound.length) + ' 条</div></div>' +
-                    renderDenseInboundTable(inbound) +
-                  '</div>' +
-                  '<div class="subpanel">' +
-                    '<div class="subpanel-head"><div class="subpanel-title">后台任务</div><div class="subpanel-meta">运行中 ' + esc(runningJobs) + ' / 总计 ' + esc(totalJobs) + (failedJobs > 0 ? ' / 失败 ' + esc(failedJobs) : '') + '</div></div>' +
-                    renderDenseJobsTable(jobs, { total: totalJobs }) +
-                  '</div>' +
-                '</div>' +
-              '</div>' +
-            "</details>"
-            );
-          }).join("")
-        );
-      } else {
-        parts.push('<div class="empty">当前筛选条件下没有 session。</div>');
+
+      if (!filtered.length) {
+        panel.innerHTML = '<div style="padding:20px; text-align:center; color:var(--muted)">NO SESSIONS FOUND</div>';
+        return;
       }
-      panel.innerHTML = parts.join("");
+
+      panel.innerHTML = filtered.map(s => {
+        const lead = summarizeSessionLead(s);
+        const isActive = !!s.activeTurnId;
+        return '<details class="session-row">' +
+          '<summary class="session-summary">' +
+            '<div class="session-key">' + esc(s.key) + '<div style="font-size:10px; font-weight:normal; color:var(--muted)">' + esc(s.channelId) + '</div></div>' +
+            '<div>' + renderBadge(isActive ? "ACTIVE" : "IDLE", isActive ? "good" : "warn") + '<div style="font-size:10px; color:var(--muted)">UP: ' + fmtTime(s.updatedAt) + '</div></div>' +
+            '<div>MSG: ' + (s.openInboundCount || 0) + ' / JOB: ' + (s.runningBackgroundJobCount || 0) + '</div>' +
+            '<div style="font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="' + esc(lead) + '">' + esc(lead) + '</div>' +
+            '<div><span style="color:var(--accent); font-size:10px;">EXPAND</span></div>' +
+          '</summary>' +
+          '<div class="session-body">' +
+            '<div style="margin-bottom:12px; font-size:11px; color:var(--muted)">CWD: ' + esc(s.workspacePath) + '</div>' +
+            '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">' +
+              '<div><div class="summary-label">INBOUND</div>' + renderInboundTable(s.openInbound) + '</div>' +
+              '<div><div class="summary-label">JOBS</div>' + renderJobsTable(s.backgroundJobs) + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</details>';
+      }).join("");
+    }
+
+    function renderInboundTable(items) {
+      if (!items?.length) return '<div style="color:var(--muted); font-size:11px;">EMPTY</div>';
+      return '<table class="tui-table"><thead><tr><th>SRC</th><th>MSG</th></tr></thead><tbody>' +
+        items.map(i => '<tr><td>' + esc(i.source) + '</td><td>' + esc(i.textPreview) + '</td></tr>').join("") +
+        '</tbody></table>';
+    }
+
+    function renderJobsTable(jobs) {
+      if (!jobs?.length) return '<div style="color:var(--muted); font-size:11px;">EMPTY</div>';
+      return '<table class="tui-table"><thead><tr><th>STATUS</th><th>KIND</th></tr></thead><tbody>' +
+        jobs.slice(0, 5).map(j => '<tr><td>' + renderBadge(j.status, statusTone(j.status)) + '</td><td>' + esc(j.kind) + '</td></tr>').join("") +
+        '</tbody></table>';
     }
 
     function renderLogs(data) {
-      const logs = data.state.recentBrokerLogs || [];
+      const logs = data.state?.recentBrokerLogs || [];
       const panel = document.getElementById("logs-panel");
       if (!logs.length) {
-        panel.innerHTML = '<div class="empty">最近没有抓到 broker 日志。</div>';
+        panel.innerHTML = '<div style="padding:12px; color:var(--muted)">NO LOGS</div>';
         return;
       }
-      panel.innerHTML = logs.map((entry) => {
-        const level = String(entry.level || "info").toLowerCase();
-        const tone = level === "warn" ? "warn" : level === "error" ? "error" : "";
-        const meta = entry.meta ? '<details><summary class="tiny">展开 meta</summary><pre>' + esc(JSON.stringify(entry.meta, null, 2)) + "</pre></details>" : "";
-        return '<div class="log-entry ' + tone + '">' +
-          '<div class="item-head"><div class="item-title">' + esc(entry.message || entry.raw || "log") + '</div>' + renderBadge(level, tone) + '</div>' +
-          '<div class="meta"><span>' + esc(fmtTime(entry.ts)) + "</span></div>" +
-          meta +
-        "</div>";
+      panel.innerHTML = logs.map(e => {
+        const tone = statusTone(e.level);
+        return '<div class="log-entry ' + tone + '">[' + fmtTime(e.ts) + '] ' + esc(e.message || e.raw) + '</div>';
       }).join("");
     }
 
@@ -1557,150 +723,71 @@ function renderAdminPage(options: {
       renderLogs(data);
     }
 
-    async function readOptionalFile(id) {
-      const input = document.getElementById(id);
-      const file = input.files && input.files[0];
-      if (!file) return undefined;
-      return await file.text();
+    function bindDialog(did, oid, cid) {
+      const d = document.getElementById(did);
+      document.getElementById(oid).onclick = () => d.showModal();
+      document.getElementById(cid).onclick = () => d.close();
+      d.onclick = (e) => { if (e.target === d) d.close(); };
     }
 
-    function bindDialog(dialogId, openId, closeId) {
-      const dialog = document.getElementById(dialogId);
-      document.getElementById(openId).addEventListener("click", () => {
-        if (typeof dialog.showModal === "function") {
-          dialog.showModal();
-        }
-      });
-      document.getElementById(closeId).addEventListener("click", () => dialog.close());
-      dialog.addEventListener("click", (event) => {
-        const rect = dialog.getBoundingClientRect();
-        const inside =
-          event.clientX >= rect.left &&
-          event.clientX <= rect.right &&
-          event.clientY >= rect.top &&
-          event.clientY <= rect.bottom;
-        if (!inside) {
-          dialog.close();
-        }
-      });
-    }
-
-    async function replaceSingleFile(options) {
-      const button = document.getElementById(options.buttonId);
-      const statusNode = document.getElementById(options.statusId);
-      const dialog = document.getElementById(options.dialogId);
-      button.disabled = true;
-      statusNode.textContent = "正在写入新文件，并重启容器里的 Codex runtime…";
-      replaceStatus.textContent = "";
+    async function replaceSingleFile(opts) {
+      const btn = document.getElementById(opts.buttonId);
+      const st = document.getElementById(opts.statusId);
+      btn.disabled = true; st.textContent = "WRITING...";
       try {
-        const pastedValue = options.textareaId ? document.getElementById(options.textareaId).value.trim() : "";
-        const fileValue = options.fileInputId ? await readOptionalFile(options.fileInputId) : undefined;
-        const content = pastedValue || fileValue;
-        if (!content) {
-          throw new Error("请先提供要替换的文件内容。");
-        }
-        const payload = {
-          auth_json_content: undefined,
-          credentials_json_content: undefined,
-          config_toml_content: undefined,
-          allow_active: document.getElementById(options.allowActiveId).checked
-        };
-        payload[options.payloadKey] = content;
-        const response = await fetch("/admin/api/replace-auth", {
-          method: "POST",
-          headers: authHeaders({
-            "content-type": "application/json"
-          }),
+        const text = document.getElementById(opts.textareaId).value.trim();
+        const fileInput = document.getElementById(opts.fileInputId);
+        const content = text || (fileInput.files[0] ? await fileInput.files[0].text() : null);
+        if (!content) throw new Error("NO CONTENT");
+        const payload = { allow_active: document.getElementById(opts.allowActiveId).checked };
+        payload[opts.payloadKey] = content;
+        const res = await fetch("/admin/api/replace-auth", {
+          method: "POST", headers: authHeaders({"content-type":"application/json"}),
           body: JSON.stringify(payload)
         });
-        const result = await response.json();
-        if (!response.ok) {
-          throw new Error(result.error || "替换失败");
-        }
-        statusNode.innerHTML = '<span class="good">' + esc(options.successMessage) + "</span>";
-        replaceStatus.innerHTML = '<span class="good">' + esc(options.successMessage) + "</span>";
-        render(result.status);
-        lastRefresh.textContent = "上次刷新：" + new Date().toLocaleTimeString();
-        if (typeof dialog.close === "function") {
-          dialog.close();
-        }
-      } catch (error) {
-        const message = error && error.message ? error.message : String(error);
-        statusNode.innerHTML = '<span class="danger">' + esc(message) + "</span>";
-        replaceStatus.innerHTML = '<span class="danger">' + esc(message) + "</span>";
-      } finally {
-        button.disabled = false;
-      }
+        const r = await res.json();
+        if (!res.ok) throw new Error(r.error || "FAILED");
+        st.innerHTML = '<span style="color:var(--good)">SUCCESS</span>';
+        render(r.status);
+        document.getElementById(opts.dialogId).close();
+      } catch (e) { st.innerHTML = '<span style="color:var(--danger)">' + esc(e.message) + '</span>'; }
+      finally { btn.disabled = false; }
     }
 
     async function refresh() {
       refreshButton.disabled = true;
       try {
-        const response = await fetch("/admin/api/status", {
-          headers: authHeaders()
-        });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "Failed to fetch status");
-        render(payload);
-        lastRefresh.textContent = "上次刷新：" + new Date().toLocaleTimeString();
-      } catch (error) {
-        document.getElementById("logs-panel").innerHTML =
-          '<div class="empty danger">读取状态失败：' + esc(error && error.message ? error.message : String(error)) + "</div>";
-      } finally {
-        refreshButton.disabled = false;
-      }
+        const res = await fetch("/admin/api/status", { headers: authHeaders() });
+        const p = await res.json();
+        if (!res.ok) throw new Error(p.error || "ERR");
+        render(p);
+        lastRefresh.textContent = "SYNCED: " + new Date().toLocaleTimeString();
+      } catch (e) { lastRefresh.textContent = "ERROR: " + e.message; }
+      finally { refreshButton.disabled = false; }
     }
 
-    refreshButton.addEventListener("click", refresh);
-    sessionSearch.addEventListener("input", () => {
-      if (latestStatus) renderSessions(latestStatus);
+    refreshButton.onclick = refresh;
+    sessionSearch.oninput = () => { if (latestStatus) renderSessions(latestStatus); };
+    sessionFilter.onchange = () => { if (latestStatus) renderSessions(latestStatus); };
+    dialogs.forEach(([d, o, c]) => bindDialog(d, o, c));
+
+    document.getElementById("submit-auth-dialog").onclick = () => replaceSingleFile({
+      dialogId: "auth-dialog", buttonId: "submit-auth-dialog", statusId: "auth-dialog-status",
+      textareaId: "auth-json-text", fileInputId: "auth-json-file", allowActiveId: "allow-active-auth",
+      payloadKey: "auth_json_content"
     });
-    sessionFilter.addEventListener("change", () => {
-      if (latestStatus) renderSessions(latestStatus);
+    document.getElementById("submit-credentials-dialog").onclick = () => replaceSingleFile({
+      dialogId: "credentials-dialog", buttonId: "submit-credentials-dialog", statusId: "credentials-dialog-status",
+      textareaId: "credentials-json-text", fileInputId: "credentials-json-file", allowActiveId: "allow-active-credentials",
+      payloadKey: "credentials_json_content"
     });
-    dialogs.forEach(([dialogId, openId, closeId]) => bindDialog(dialogId, openId, closeId));
+    document.getElementById("submit-config-dialog").onclick = () => replaceSingleFile({
+      dialogId: "config-dialog", buttonId: "submit-config-dialog", statusId: "config-dialog-status",
+      textareaId: "config-toml-text", fileInputId: "config-toml-file", allowActiveId: "allow-active-config",
+      payloadKey: "config_toml_content"
+    });
 
-    document.getElementById("submit-auth-dialog").addEventListener("click", () =>
-      replaceSingleFile({
-        dialogId: "auth-dialog",
-        buttonId: "submit-auth-dialog",
-        statusId: "auth-dialog-status",
-        textareaId: "auth-json-text",
-        fileInputId: "auth-json-file",
-        allowActiveId: "allow-active-auth",
-        payloadKey: "auth_json_content",
-        successMessage: "auth.json 已替换完成，内置 Codex runtime 已重启。"
-      })
-    );
-
-    document.getElementById("submit-credentials-dialog").addEventListener("click", () =>
-      replaceSingleFile({
-        dialogId: "credentials-dialog",
-        buttonId: "submit-credentials-dialog",
-        statusId: "credentials-dialog-status",
-        textareaId: "credentials-json-text",
-        fileInputId: "credentials-json-file",
-        allowActiveId: "allow-active-credentials",
-        payloadKey: "credentials_json_content",
-        successMessage: ".credentials.json 已替换完成，内置 Codex runtime 已重启。"
-      })
-    );
-
-    document.getElementById("submit-config-dialog").addEventListener("click", () =>
-      replaceSingleFile({
-        dialogId: "config-dialog",
-        buttonId: "submit-config-dialog",
-        statusId: "config-dialog-status",
-        textareaId: "config-toml-text",
-        fileInputId: "config-toml-file",
-        allowActiveId: "allow-active-config",
-        payloadKey: "config_toml_content",
-        successMessage: "config.toml 已替换完成，内置 Codex runtime 已重启。"
-      })
-    );
-
-    refresh();
-    setInterval(refresh, 10000);
+    refresh(); setInterval(refresh, 10000);
   </script>
 </body>
 </html>`;
