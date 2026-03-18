@@ -188,9 +188,8 @@ export class AppServerProcess {
       return;
     }
 
-    const credentials = await this.#readStoredOauthServerNames();
     const configuredServers = await this.#listConfiguredMcpServers();
-    const namesToDisable = this.#disabledMcpServers.filter((name) => configuredServers.has(name) && !credentials.has(name));
+    const namesToDisable = this.#disabledMcpServers.filter((name) => configuredServers.has(name));
 
     for (const name of namesToDisable) {
       try {
@@ -202,27 +201,6 @@ export class AppServerProcess {
           error: error instanceof Error ? error.message : String(error)
         });
       }
-    }
-  }
-
-  async #readStoredOauthServerNames(): Promise<Set<string>> {
-    const credentialsPath = path.join(this.#codexHome, ".credentials.json");
-    if (!(await fileExists(credentialsPath))) {
-      return new Set();
-    }
-
-    try {
-      const raw = await fs.readFile(credentialsPath, "utf8");
-      const parsed = JSON.parse(raw) as Record<string, { server_name?: string }>;
-      const names = Object.values(parsed)
-        .map((entry) => entry?.server_name)
-        .filter((value): value is string => Boolean(value));
-      return new Set(names);
-    } catch (error) {
-      logger.warn("Failed to read broker MCP credentials file", {
-        error: error instanceof Error ? error.message : String(error)
-      });
-      return new Set();
     }
   }
 

@@ -368,6 +368,22 @@ export class AppServerClient extends EventEmitter {
       limit: 20,
       format: "text"
     });
+    const linearToolsUrl = `${this.options.brokerHttpBaseUrl}/integrations/mcp-tools?server=linear`;
+    const notionToolsUrl = `${this.options.brokerHttpBaseUrl}/integrations/mcp-tools?server=notion`;
+    const linearCallPayload = JSON.stringify({
+      server: "linear",
+      name: "replace_with_linear_tool_name",
+      arguments: {
+        replace: "with tool arguments"
+      }
+    });
+    const notionCallPayload = JSON.stringify({
+      server: "notion",
+      name: "replace_with_notion_tool_name",
+      arguments: {
+        replace: "with tool arguments"
+      }
+    });
     const jobPayload = JSON.stringify({
       channel_id: session.channelId,
       thread_ts: session.rootThreadTs,
@@ -406,6 +422,18 @@ export class AppServerClient extends EventEmitter {
         "- Prefer absolute file_path values when uploading local artifacts.",
         "- Registered background jobs receive environment variables including BROKER_JOB_ID, BROKER_JOB_TOKEN, BROKER_API_BASE, BROKER_JOB_HELPER, SLACK_CHANNEL_ID, SLACK_THREAD_TS, SESSION_KEY, SESSION_WORKSPACE, and REPOS_ROOT.",
         "- Inside a background job script, prefer `node \"$BROKER_JOB_HELPER\" ...` for heartbeat/event/complete/fail/cancel callbacks instead of hand-writing nested curl JSON payloads."
+      ].join("\n"),
+      [
+        "Isolated Linear/Notion access for this session:",
+        "- The main Codex runtime for this Slack broker does not load the linear or notion MCPs directly.",
+        "- To use Linear or Notion, first list tools from the broker's isolated integration endpoint, then call the specific tool you need.",
+        `- List Linear tools with: curl -sS '${linearToolsUrl}'`,
+        `- List Notion tools with: curl -sS '${notionToolsUrl}'`,
+        `- Call a Linear tool with: curl -sS -X POST ${this.options.brokerHttpBaseUrl}/integrations/mcp-call -H 'content-type: application/json' -d '${linearCallPayload}'`,
+        `- Call a Notion tool with: curl -sS -X POST ${this.options.brokerHttpBaseUrl}/integrations/mcp-call -H 'content-type: application/json' -d '${notionCallPayload}'`,
+        "- The tool-list endpoint returns JSON with ok/server/tools.",
+        "- The tool-call endpoint returns JSON with ok/server/name/result.",
+        "- If the isolated integration call fails, tell Slack that the specific integration is unavailable right now. Do not assume the whole runtime is broken."
       ].join("\n"),
       "Slack UX preference: do not stay silent for a long stretch if there is a meaningful progress point worth sharing. Use judgment. If you have a concrete update, short plan adjustment, blocker, or partial conclusion that would help the people in the thread, send a brief Slack update. If there is nothing meaningful to say yet, keep working and avoid filler. Do not turn routine polling or watcher noise into Slack chatter.",
       [

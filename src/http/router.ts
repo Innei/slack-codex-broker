@@ -3,15 +3,18 @@ import { URL } from "node:url";
 
 import type { AppConfig } from "../config.js";
 import type { AdminService } from "../services/admin-service.js";
+import type { IsolatedMcpService } from "../services/codex/isolated-mcp-service.js";
 import type { JobManager } from "../services/job-manager.js";
 import type { SlackCodexBridge } from "../services/slack/slack-codex-bridge.js";
 import { handleAdminRequest } from "./admin-routes.js";
+import { handleIntegrationRequest } from "./integration-routes.js";
 import { handleJobRequest } from "./job-routes.js";
 import { handleSlackRequest } from "./slack-routes.js";
 
 export function createHttpHandler(options: {
   readonly adminService: AdminService;
   readonly bridge: SlackCodexBridge;
+  readonly isolatedMcp: IsolatedMcpService;
   readonly jobManager: JobManager;
   readonly config: AppConfig;
 }): (request: http.IncomingMessage, response: http.ServerResponse) => void {
@@ -26,6 +29,7 @@ async function handleHttpRequest(
   options: {
     readonly adminService: AdminService;
     readonly bridge: SlackCodexBridge;
+    readonly isolatedMcp: IsolatedMcpService;
     readonly jobManager: JobManager;
     readonly config: AppConfig;
   }
@@ -38,6 +42,10 @@ async function handleHttpRequest(
   }
 
   if (await handleJobRequest(method, url, request, response, options)) {
+    return;
+  }
+
+  if (await handleIntegrationRequest(method, url, request, response, options)) {
     return;
   }
 

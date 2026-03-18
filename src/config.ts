@@ -17,6 +17,7 @@ export interface AppConfig {
   readonly codexHome: string;
   readonly codexHostHomePath?: string | undefined;
   readonly codexAuthJsonPath?: string | undefined;
+  readonly isolatedMcpServers: string[];
   readonly codexDisabledMcpServers: string[];
   readonly codexAppServerUrl?: string | undefined;
   readonly codexAppServerPort: number;
@@ -58,6 +59,10 @@ function getCsvList(env: NodeJS.ProcessEnv, name: string): string[] {
     .split(",")
     .map((entry) => entry.trim())
     .filter(Boolean);
+}
+
+function unique(values: readonly string[]): string[] {
+  return [...new Set(values)];
 }
 
 function getNumber(env: NodeJS.ProcessEnv, name: string, fallback: number): number {
@@ -117,6 +122,14 @@ export function loadConfig(env = process.env): AppConfig {
   const logDir = env.LOG_DIR ? path.resolve(env.LOG_DIR) : path.join(dataRoot, "logs");
   const port = getNumber(env, "PORT", 3000);
 
+  const isolatedMcpServers = getCsvList(env, "ISOLATED_MCP_SERVERS");
+  const effectiveIsolatedMcpServers =
+    isolatedMcpServers.length > 0 ? isolatedMcpServers : ["linear", "notion"];
+  const codexDisabledMcpServers = unique([
+    ...getCsvList(env, "CODEX_DISABLED_MCP_SERVERS"),
+    ...effectiveIsolatedMcpServers
+  ]);
+
   return {
     slackAppToken: getRequired(env, "SLACK_APP_TOKEN"),
     slackBotToken: getRequired(env, "SLACK_BOT_TOKEN"),
@@ -134,7 +147,8 @@ export function loadConfig(env = process.env): AppConfig {
     codexHome,
     codexHostHomePath: getOptional(env, "CODEX_HOST_HOME_PATH"),
     codexAuthJsonPath: getOptional(env, "CODEX_AUTH_JSON_PATH"),
-    codexDisabledMcpServers: getCsvList(env, "CODEX_DISABLED_MCP_SERVERS"),
+    isolatedMcpServers: effectiveIsolatedMcpServers,
+    codexDisabledMcpServers,
     codexAppServerUrl: getOptional(env, "CODEX_APP_SERVER_URL"),
     codexAppServerPort: getNumber(env, "CODEX_APP_SERVER_PORT", 4590),
     codexOpenAiApiKey: getOptional(env, "OPENAI_API_KEY"),

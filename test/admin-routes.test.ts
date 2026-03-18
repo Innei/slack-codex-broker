@@ -30,6 +30,7 @@ describe("admin routes", () => {
       createHttpHandler({
         adminService: adminService as never,
         bridge: {} as never,
+        isolatedMcp: {} as never,
         jobManager: {} as never,
         config
       })
@@ -82,6 +83,7 @@ describe("admin routes", () => {
       createHttpHandler({
         adminService: adminService as never,
         bridge: {} as never,
+        isolatedMcp: {} as never,
         jobManager: {} as never,
         config
       })
@@ -133,6 +135,7 @@ describe("admin routes", () => {
       createHttpHandler({
         adminService: adminService as never,
         bridge: {} as never,
+        isolatedMcp: {} as never,
         jobManager: {} as never,
         config
       })

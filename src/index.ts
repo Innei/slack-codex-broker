@@ -5,6 +5,7 @@ import { createHttpHandler } from "./http/router.js";
 import { configureLogger, logger } from "./logger.js";
 import { AdminService } from "./services/admin-service.js";
 import { CodexBroker } from "./services/codex/codex-broker.js";
+import { IsolatedMcpService } from "./services/codex/isolated-mcp-service.js";
 import { JobManager } from "./services/job-manager.js";
 import { SessionManager } from "./services/session-manager.js";
 import { SlackCodexBridge } from "./services/slack/slack-codex-bridge.js";
@@ -44,6 +45,10 @@ export async function startService(): Promise<{
     sessions: sessionManager,
     codex: codexBroker
   });
+  const isolatedMcp = new IsolatedMcpService({
+    codexHome: config.codexHome,
+    isolatedMcpServers: config.isolatedMcpServers
+  });
   const jobManager = new JobManager({
     sessions: sessionManager,
     jobsRoot: config.jobsRoot,
@@ -63,6 +68,7 @@ export async function startService(): Promise<{
     createHttpHandler({
       adminService,
       bridge,
+      isolatedMcp,
       jobManager,
       config
     })

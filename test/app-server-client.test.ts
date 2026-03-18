@@ -515,6 +515,30 @@ describe("AppServerClient disconnect handling", () => {
       expect.stringContaining("BROKER_JOB_HELPER")
     );
     expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("The main Codex runtime for this Slack broker does not load the linear or notion MCPs directly")
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("/integrations/mcp-tools?server=linear")
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("/integrations/mcp-tools?server=notion")
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("/integrations/mcp-call")
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("\"server\":\"linear\"")
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("\"name\":\"replace_with_linear_tool_name\"")
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("\"server\":\"notion\"")
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("\"name\":\"replace_with_notion_tool_name\"")
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
       expect.stringContaining("Turn stopping contract")
     );
     expect(threadStartParams?.baseInstructions).toEqual(

@@ -32,6 +32,8 @@ describe("loadConfig", () => {
     expect(config.logRawCodexRpc).toBe(true);
     expect(config.logRawHttpRequests).toBe(true);
     expect(config.brokerAdminToken).toBeUndefined();
+    expect(config.isolatedMcpServers).toEqual(["linear", "notion"]);
+    expect(config.codexDisabledMcpServers).toEqual(["linear", "notion"]);
   });
 
   it("rejects invalid numeric values", () => {
@@ -54,14 +56,16 @@ describe("loadConfig", () => {
     expect(config.codexHostHomePath).toBe("/host-codex-home");
   });
 
-  it("parses disabled MCP servers as a csv list", () => {
+  it("parses disabled MCP servers as a csv list and unions isolated MCP servers", () => {
     const config = loadConfig({
       SLACK_APP_TOKEN: "xapp-test",
       SLACK_BOT_TOKEN: "xoxb-test",
-      CODEX_DISABLED_MCP_SERVERS: " notion, linear ,, "
+      CODEX_DISABLED_MCP_SERVERS: " github, linear ,, ",
+      ISOLATED_MCP_SERVERS: " notion, linear ,, "
     } as NodeJS.ProcessEnv);
 
-    expect(config.codexDisabledMcpServers).toEqual(["notion", "linear"]);
+    expect(config.isolatedMcpServers).toEqual(["notion", "linear"]);
+    expect(config.codexDisabledMcpServers).toEqual(["github", "linear", "notion"]);
   });
 
   it("parses log configuration", () => {
