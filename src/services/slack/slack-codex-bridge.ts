@@ -136,6 +136,15 @@ export class SlackCodexBridge {
     await this.#conversations.postSlackMessage(options);
   }
 
+  async postSlackState(options: {
+    readonly channelId: string;
+    readonly rootThreadTs: string;
+    readonly kind: "wait";
+    readonly reason: string;
+  }): Promise<void> {
+    await this.#conversations.postSlackState(options);
+  }
+
   async postSlackFile(options: {
     readonly channelId: string;
     readonly rootThreadTs: string;

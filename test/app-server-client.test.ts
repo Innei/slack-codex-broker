@@ -521,6 +521,9 @@ describe("AppServerClient disconnect handling", () => {
       expect.stringContaining("kind=wait")
     );
     expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("/slack/post-state")
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
       expect.stringContaining("Do not emit repeated wait updates for routine watcher ticks")
     );
     expect(threadStartParams?.baseInstructions).toEqual(

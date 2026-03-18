@@ -39,6 +39,11 @@ export async function handleSlackRequest(
     return true;
   }
 
+  if (method === "POST" && url.pathname === "/slack/post-state") {
+    await handleSlackPostStateRequest(request, response, options);
+    return true;
+  }
+
   if (method === "POST" && url.pathname === "/slack/post-file") {
     await handleSlackPostFileRequest(request, response, options);
     return true;
@@ -223,6 +228,82 @@ async function handleSlackPostMessageRequest(
       rootThreadTs,
       text,
       kind: kind as "progress" | "final" | "block" | "wait" | undefined,
+      reason
+    });
+    respondJson(response, 200, { ok: true });
+  } catch (error) {
+    respondJson(response, 500, {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+async function handleSlackPostStateRequest(
+  request: http.IncomingMessage,
+  response: http.ServerResponse,
+  options: {
+    readonly bridge: SlackCodexBridge;
+  }
+): Promise<void> {
+  let body: Record<string, string>;
+
+  try {
+    body = await readFormBody(request);
+  } catch (error) {
+    respondJson(response, 400, {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    return;
+  }
+
+  logger.raw("http-requests", {
+    method: "POST",
+    path: "/slack/post-state",
+    body
+  }, {
+    channelId: body.channel_id,
+    rootThreadTs: body.thread_ts
+  });
+
+  const channelId = body.channel_id;
+  const rootThreadTs = body.thread_ts;
+  const kind = body.kind?.trim();
+  const reason = body.reason?.trim() || body.stop_reason?.trim() || undefined;
+
+  if (!channelId || !rootThreadTs || !kind) {
+    respondJson(response, 400, {
+      ok: false,
+      error: "missing_required_body",
+      required: ["channel_id", "thread_ts", "kind"]
+    });
+    return;
+  }
+
+  if (kind !== "wait") {
+    respondJson(response, 400, {
+      ok: false,
+      error: "invalid_kind",
+      allowed: ["wait"]
+    });
+    return;
+  }
+
+  if (!reason) {
+    respondJson(response, 400, {
+      ok: false,
+      error: "missing_reason",
+      required: ["reason"]
+    });
+    return;
+  }
+
+  try {
+    await options.bridge.postSlackState({
+      channelId,
+      rootThreadTs,
+      kind: "wait",
       reason
     });
     respondJson(response, 200, { ok: true });

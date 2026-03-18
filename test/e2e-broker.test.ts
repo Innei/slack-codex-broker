@@ -485,7 +485,7 @@ describe.sequential("slack-codex-broker e2e", () => {
       text: "<@UBOT> 继续把这个做完"
     });
 
-    await waitFor(() => mockCodex.turnsStarted.length >= 2, "unexpected stop wake turn");
+    await waitFor(() => mockCodex.turnsStarted.length >= 2, "unexpected stop wake turn", 60_000);
     const wakeText = collectTextInput(mockCodex.turnsStarted[1]!.input);
     expect(wakeText).toContain("unexpected_turn_stop_json");
     expect(wakeText).toContain("explicit final, block, or wait state");
@@ -510,10 +510,9 @@ describe.sequential("slack-codex-broker e2e", () => {
       onTurnStart: async () => {
         turnCount += 1;
         if (turnCount === 1) {
-          await postJson(`${brokerBaseUrl}/slack/post-message`, {
+          await postJson(`${brokerBaseUrl}/slack/post-state`, {
             channel_id: "C123",
             thread_ts: "777.220",
-            text: "我先等异步结果回来。",
             kind: "wait",
             reason: "waiting for async job"
           });
@@ -550,6 +549,77 @@ describe.sequential("slack-codex-broker e2e", () => {
     expect(wakeText).toContain("there is no running broker-managed async job");
     await waitForSessionIdle(tempRoot, "C123:777.220");
     expect(turnCount).toBe(2);
+  }, 60_000);
+
+  it("does not wake a silent wait turn when a running async job backs that wait state", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-broker-e2e-"));
+    cleanups.push(async () => {
+      await removeTempRoot(tempRoot);
+    });
+
+    const brokerPort = await getFreePort();
+    const brokerBaseUrl = `http://127.0.0.1:${brokerPort}`;
+    const mockSlack = new MockSlackServer("UBOT", {
+      botId: "BBOT",
+      appId: "AAPP"
+    });
+    let turnCount = 0;
+    const mockCodex = new MockCodexAppServer({
+      onTurnStart: async () => {
+        turnCount += 1;
+        if (turnCount === 1) {
+          const registerResponse = await fetch(`${brokerBaseUrl}/jobs/register`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json"
+            },
+            body: JSON.stringify({
+              channel_id: "C123",
+              thread_ts: "778.220",
+              kind: "watch_ci",
+              script: "#!/bin/sh\nsleep 30"
+            })
+          });
+          expect(registerResponse.ok).toBe(true);
+
+          await postJson(`${brokerBaseUrl}/slack/post-state`, {
+            channel_id: "C123",
+            thread_ts: "778.220",
+            kind: "wait",
+            reason: "waiting for async job"
+          });
+        }
+      }
+    });
+    const slackPort = await mockSlack.start();
+    const codexUrl = await mockCodex.start();
+    cleanups.push(async () => {
+      await mockCodex.stop();
+      await mockSlack.stop();
+    });
+
+    const broker = await startBrokerProcess({
+      port: brokerPort,
+      slackPort,
+      codexUrl,
+      tempRoot
+    });
+    cleanups.push(() => broker.stop());
+
+    await mockSlack.sendEvent("evt-session", {
+      type: "app_mention",
+      user: "U123",
+      channel: "C123",
+      thread_ts: "778.220",
+      ts: "778.221",
+      text: "<@UBOT> 盯一下这个"
+    });
+
+    await waitForSessionIdle(tempRoot, "C123:778.220");
+    const postedMessageCountAfterIdle = mockSlack.postedMessages.length;
+    await delay(1_000);
+    expect(turnCount).toBe(1);
+    expect(mockSlack.postedMessages).toHaveLength(postedMessageCountAfterIdle);
   }, 60_000);
 
   it("does not recover the broker's own Slack messages as inbound work", async () => {

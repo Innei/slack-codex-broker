@@ -332,6 +332,25 @@ export class SlackConversationService {
     }
   }
 
+  async postSlackState(options: {
+    readonly channelId: string;
+    readonly rootThreadTs: string;
+    readonly kind: "wait";
+    readonly reason: string;
+  }): Promise<void> {
+    const session = this.#sessions.getSession(options.channelId, options.rootThreadTs);
+    if (!session) {
+      throw new Error(`Unknown session for Slack state update: ${options.channelId}:${options.rootThreadTs}`);
+    }
+
+    await this.#sessions.recordTurnSignal(options.channelId, options.rootThreadTs, {
+      turnId: this.#resolveTurnIdForSignal(session),
+      kind: options.kind,
+      reason: options.reason,
+      occurredAt: new Date().toISOString()
+    });
+  }
+
   async postSlackFile(options: {
     readonly channelId: string;
     readonly rootThreadTs: string;

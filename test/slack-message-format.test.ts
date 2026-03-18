@@ -262,6 +262,7 @@ describe("formatSlackMessageForCodex", () => {
     expect(result).toContain("\"event_kind\": \"state_changed\"");
     expect(result).toContain("\"summary\": \"CI turned green.\"");
     expect(result).toContain("Most watcher events do not need a Slack reply.");
+    expect(result).toContain("/slack/post-state");
     expect(result).not.toContain("\"sender\":");
   });
 
@@ -288,7 +289,7 @@ describe("formatSlackMessageForCodex", () => {
     expect(result).toContain("\"turn_id\": \"turn-123\"");
     expect(result).toContain("kind=block");
     expect(result).toContain("kind=wait");
-    expect(result).toContain("Do not use it for routine watcher ticks.");
+    expect(result).toContain("/slack/post-state");
   });
 });
 
