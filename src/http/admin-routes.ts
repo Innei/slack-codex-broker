@@ -1033,11 +1033,67 @@ function renderAdminPage(options: {
       }
     }
 
-    function fmtUnixSeconds(value) {
-      if (value == null) return "—";
-      const seconds = Number(value);
-      if (!Number.isFinite(seconds)) return String(value);
-      return fmtTime(seconds * 1000);
+    function clampPercent(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return 0;
+      return Math.max(0, Math.min(100, Math.round(number)));
+    }
+
+    function formatWindowLabel(windowDurationMins) {
+      const mins = Number(windowDurationMins);
+      if (!Number.isFinite(mins) || mins <= 0) {
+        return "window unknown";
+      }
+      if (mins === 300) {
+        return "5h";
+      }
+      if (mins === 10080) {
+        return "weekly";
+      }
+      if (mins % 1440 === 0) {
+        return String(mins / 1440) + "d";
+      }
+      if (mins % 60 === 0) {
+        return String(mins / 60) + "h";
+      }
+      return String(mins) + "m";
+    }
+
+    function formatRelativeDuration(ms) {
+      const absMs = Math.abs(ms);
+      const totalMinutes = Math.round(absMs / 60000);
+      if (totalMinutes < 1) {
+        return "under 1m";
+      }
+      if (totalMinutes < 60) {
+        return totalMinutes + "m";
+      }
+      const totalHours = Math.round(absMs / 3600000);
+      if (totalHours < 48) {
+        return totalHours + "h";
+      }
+      const totalDays = Math.round(absMs / 86400000);
+      return totalDays + "d";
+    }
+
+    function formatResetTime(resetsAtSeconds) {
+      if (resetsAtSeconds == null) {
+        return "reset unknown";
+      }
+
+      const resetMs = Number(resetsAtSeconds) * 1000;
+      if (!Number.isFinite(resetMs)) {
+        return "reset " + String(resetsAtSeconds);
+      }
+
+      const delta = resetMs - Date.now();
+      if (Math.abs(delta) < 30000) {
+        return "just reset";
+      }
+
+      const relative = formatRelativeDuration(delta);
+      const exact = fmtTime(resetMs);
+      return delta > 0 ? ("resets in " + relative + " · " + exact) : ("reset " + relative + " ago · " + exact);
     }
 
     function fmtDuration(totalSeconds) {
@@ -1155,13 +1211,11 @@ function renderAdminPage(options: {
         return "—";
       }
 
-      const parts = [String(window.usedPercent) + "% used"];
-      if (window.windowDurationMins != null) {
-        parts.push(String(window.windowDurationMins) + "m");
-      }
-      if (window.resetsAt != null) {
-        parts.push("reset " + fmtUnixSeconds(window.resetsAt));
-      }
+      const usedPercent = clampPercent(window.usedPercent);
+      const remainingPercent = Math.max(0, 100 - usedPercent);
+      const parts = [String(remainingPercent) + "% left"];
+      parts.push(formatWindowLabel(window.windowDurationMins));
+      parts.push(formatResetTime(window.resetsAt));
       return parts.join(" · ");
     }
 
