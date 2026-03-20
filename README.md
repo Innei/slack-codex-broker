@@ -82,13 +82,7 @@ volumes:
 
 At startup the broker copies that file into its own `CODEX_HOME`/data directory and uses it to authenticate the embedded Codex app-server.
 
-If you want the broker to drop stale OAuth MCP entries that exist in your host config but are not logged in inside the container, set:
-
-```env
-CODEX_DISABLED_MCP_SERVERS=notion
-```
-
-This only removes those MCP servers from the broker's container-local Codex config. It does not modify your host `~/.codex/config.toml`.
+The main Codex runtime disables all built-in MCP servers by default. Keep tool access outside the main runtime and use broker-managed integrations instead. This only removes those MCP servers from the broker's container-local Codex config. It does not modify your host `~/.codex/config.toml`.
 
 ## Reuse Global Codex Memory
 

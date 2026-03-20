@@ -37,7 +37,7 @@ describe("loadConfig", () => {
     expect(config.geminiHttpsProxy).toBeUndefined();
     expect(config.geminiAllProxy).toBeUndefined();
     expect(config.isolatedMcpServers).toEqual(["linear", "notion"]);
-    expect(config.codexDisabledMcpServers).toEqual(["linear", "notion"]);
+    expect(config.codexDisabledMcpServers).toEqual(["*", "linear", "notion"]);
   });
 
   it("rejects invalid numeric values", () => {
@@ -85,7 +85,7 @@ describe("loadConfig", () => {
     } as NodeJS.ProcessEnv);
 
     expect(config.isolatedMcpServers).toEqual(["notion", "linear"]);
-    expect(config.codexDisabledMcpServers).toEqual(["github", "linear", "notion"]);
+    expect(config.codexDisabledMcpServers).toEqual(["*", "github", "linear", "notion"]);
   });
 
   it("parses log configuration", () => {

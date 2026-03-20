@@ -9,6 +9,8 @@ import { ensureDir, fileExists } from "../../utils/fs.js";
 import { syncUserCodexHome } from "./codex-home.js";
 import { syncGeminiHome } from "./gemini-home.js";
 
+const ALL_MCP_SERVERS = "*";
+
 export class AppServerProcess {
   readonly #codexHome: string;
   readonly #runtimeHome: string;
@@ -219,7 +221,9 @@ export class AppServerProcess {
     }
 
     const configuredServers = await this.#listConfiguredMcpServers();
-    const namesToDisable = this.#disabledMcpServers.filter((name) => configuredServers.has(name));
+    const namesToDisable = this.#disabledMcpServers.includes(ALL_MCP_SERVERS)
+      ? [...configuredServers]
+      : this.#disabledMcpServers.filter((name) => configuredServers.has(name));
 
     for (const name of namesToDisable) {
       try {

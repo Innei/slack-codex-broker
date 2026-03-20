@@ -37,6 +37,8 @@ export interface AppConfig {
   readonly logRawHttpRequests: boolean;
 }
 
+const ALL_CODEX_MCP_SERVERS = "*";
+
 function getRequired(env: NodeJS.ProcessEnv, name: string): string {
   const value = env[name];
 
@@ -130,6 +132,7 @@ export function loadConfig(env = process.env): AppConfig {
   const effectiveIsolatedMcpServers =
     isolatedMcpServers.length > 0 ? isolatedMcpServers : ["linear", "notion"];
   const codexDisabledMcpServers = unique([
+    ALL_CODEX_MCP_SERVERS,
     ...getCsvList(env, "CODEX_DISABLED_MCP_SERVERS"),
     ...effectiveIsolatedMcpServers
   ]);
