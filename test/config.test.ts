@@ -38,6 +38,7 @@ describe("loadConfig", () => {
     expect(config.geminiAllProxy).toBeUndefined();
     expect(config.isolatedMcpServers).toEqual(["linear", "notion"]);
     expect(config.codexDisabledMcpServers).toEqual(["*", "linear", "notion"]);
+    expect(config.tempadLinkServiceUrl).toBeUndefined();
   });
 
   it("rejects invalid numeric values", () => {
@@ -74,6 +75,16 @@ describe("loadConfig", () => {
     expect(config.geminiHttpProxy).toBe("http://host.docker.internal:6152");
     expect(config.geminiHttpsProxy).toBe("http://host.docker.internal:6152");
     expect(config.geminiAllProxy).toBe("socks5://host.docker.internal:6153");
+  });
+
+  it("loads an explicit tempad link service url override", () => {
+    const config = loadConfig({
+      SLACK_APP_TOKEN: "xapp-test",
+      SLACK_BOT_TOKEN: "xoxb-test",
+      TEMPAD_LINK_SERVICE_URL: "http://host.docker.internal:4320"
+    } as NodeJS.ProcessEnv);
+
+    expect(config.tempadLinkServiceUrl).toBe("http://host.docker.internal:4320");
   });
 
   it("parses disabled MCP servers as a csv list and unions isolated MCP servers", () => {

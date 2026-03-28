@@ -26,6 +26,7 @@ export interface AppConfig {
   readonly codexAppServerUrl?: string | undefined;
   readonly codexAppServerPort: number;
   readonly codexOpenAiApiKey?: string | undefined;
+  readonly tempadLinkServiceUrl?: string | undefined;
   readonly port: number;
   readonly brokerHttpBaseUrl: string;
   readonly serviceName: string;
@@ -163,6 +164,7 @@ export function loadConfig(env = process.env): AppConfig {
     codexAppServerUrl: getOptional(env, "CODEX_APP_SERVER_URL"),
     codexAppServerPort: getNumber(env, "CODEX_APP_SERVER_PORT", 4590),
     codexOpenAiApiKey: getOptional(env, "OPENAI_API_KEY"),
+    tempadLinkServiceUrl: getOptional(env, "TEMPAD_LINK_SERVICE_URL"),
     port,
     brokerHttpBaseUrl: env.BROKER_HTTP_BASE_URL ?? `http://127.0.0.1:${port}`,
     serviceName: env.SERVICE_NAME ?? "slack-codex-broker",

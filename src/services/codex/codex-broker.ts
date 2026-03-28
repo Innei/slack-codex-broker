@@ -39,6 +39,7 @@ export class CodexBroker {
     readonly codexAppServerUrl?: string | undefined;
     readonly codexAuthJsonPath?: string | undefined;
     readonly codexDisabledMcpServers: string[];
+    readonly tempadLinkServiceUrl?: string | undefined;
     readonly geminiHttpProxy?: string | undefined;
     readonly geminiHttpsProxy?: string | undefined;
     readonly geminiAllProxy?: string | undefined;
@@ -64,6 +65,7 @@ export class CodexBroker {
       port: options.codexAppServerPort,
       authJsonPath: options.codexAuthJsonPath,
       disabledMcpServers: options.codexDisabledMcpServers,
+      tempadLinkServiceUrl: options.tempadLinkServiceUrl,
       geminiHttpProxy: options.geminiHttpProxy,
       geminiHttpsProxy: options.geminiHttpsProxy,
       geminiAllProxy: options.geminiAllProxy,

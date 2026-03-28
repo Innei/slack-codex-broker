@@ -39,6 +39,7 @@ export async function startService(): Promise<{
     codexAppServerUrl: config.codexAppServerUrl,
     codexAuthJsonPath: config.codexAuthJsonPath,
     codexDisabledMcpServers: config.codexDisabledMcpServers,
+    tempadLinkServiceUrl: config.tempadLinkServiceUrl,
     geminiHttpProxy: config.geminiHttpProxy,
     geminiHttpsProxy: config.geminiHttpsProxy,
     geminiAllProxy: config.geminiAllProxy,

@@ -114,7 +114,7 @@ Recommended behavior:
 - directories like `skills/` and `superpowers/` are copied into the container `CODEX_HOME`
 - `HOST_AGENTS_PATH_HOST` plus `HOST_AGENTS_CONTAINER_PATH` lets relative skill symlinks like `../../.agents/...` resolve correctly during that copy
 - if your host skills contain relative symlinks, set `CODEX_HOST_HOME_PATH` to the same absolute path as the host so those symlinks keep resolving inside the container
-- for docker-side skills that need to call a host-local helper service, override them with an explicit container-safe URL such as `TEMPAD_LINK_SERVICE_URL=http://host.docker.internal:4318`
+- for docker-side skills that need to call a host-local helper service, either set an explicit container-safe URL such as `TEMPAD_LINK_SERVICE_URL=http://host.docker.internal:4320`, or leave it unset and let the broker probe the common host-local tempad endpoints automatically
 
 This keeps personal memory on the familiar `~/.codex/AGENT.md` path inside the broker runtime, while allowing broker-specific repo instructions (`AGENTS.md`) to fork away from your personal host setup without sharing the container's sqlite/log/session state.
 

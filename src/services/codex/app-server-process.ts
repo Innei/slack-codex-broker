@@ -20,6 +20,7 @@ export class AppServerProcess {
   readonly #hostCodexHomePath: string | undefined;
   readonly #hostGeminiHomePath: string | undefined;
   readonly #disabledMcpServers: string[];
+  readonly #tempadLinkServiceUrl: string | undefined;
   readonly #geminiHttpProxy: string | undefined;
   readonly #geminiHttpsProxy: string | undefined;
   readonly #geminiAllProxy: string | undefined;
@@ -34,6 +35,7 @@ export class AppServerProcess {
     readonly hostCodexHomePath?: string | undefined;
     readonly hostGeminiHomePath?: string | undefined;
     readonly disabledMcpServers?: string[] | undefined;
+    readonly tempadLinkServiceUrl?: string | undefined;
     readonly geminiHttpProxy?: string | undefined;
     readonly geminiHttpsProxy?: string | undefined;
     readonly geminiAllProxy?: string | undefined;
@@ -46,6 +48,7 @@ export class AppServerProcess {
     this.#hostCodexHomePath = options.hostCodexHomePath;
     this.#hostGeminiHomePath = options.hostGeminiHomePath;
     this.#disabledMcpServers = options.disabledMcpServers ?? [];
+    this.#tempadLinkServiceUrl = options.tempadLinkServiceUrl;
     this.#geminiHttpProxy = options.geminiHttpProxy;
     this.#geminiHttpsProxy = options.geminiHttpsProxy;
     this.#geminiAllProxy = options.geminiAllProxy;
@@ -63,12 +66,13 @@ export class AppServerProcess {
     await this.#prepareCodexHome();
     await this.#bootstrapAuth();
     await this.#disableConfiguredMcpServers();
+    const tempadLinkServiceUrl = await this.#resolveTempadLinkServiceUrl();
 
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       CODEX_HOME: this.#codexHome,
       HOME: this.#runtimeHome,
-      TEMPAD_LINK_SERVICE_URL: process.env.TEMPAD_LINK_SERVICE_URL || "http://host.docker.internal:4318",
+      TEMPAD_LINK_SERVICE_URL: tempadLinkServiceUrl,
       BROKER_GEMINI_UI_HELPER: "/app/dist/src/tools/gemini-ui.js"
     };
 
@@ -287,6 +291,28 @@ export class AppServerProcess {
       });
     });
   }
+
+  async #resolveTempadLinkServiceUrl(): Promise<string> {
+    const candidates = uniqueStrings([
+      this.#tempadLinkServiceUrl,
+      "http://host.docker.internal:4318",
+      "http://host.docker.internal:4320"
+    ]);
+
+    for (const candidate of candidates) {
+      if (await isHealthyHttpService(candidate)) {
+        logger.info("Selected tempad link service url", { url: candidate });
+        return candidate;
+      }
+    }
+
+    const fallback = candidates[0] ?? "http://host.docker.internal:4320";
+    logger.warn("Failed to find a healthy tempad link service; falling back to first candidate", {
+      url: fallback,
+      attemptedCandidates: candidates
+    });
+    return fallback;
+  }
 }
 
 function killChildProcessGroup(
@@ -334,4 +360,19 @@ async function waitForChildExit(
 
     child.once("exit", onExit);
   });
+}
+
+async function isHealthyHttpService(baseUrl: string): Promise<boolean> {
+  try {
+    const response = await fetch(new URL("/health", baseUrl), {
+      signal: AbortSignal.timeout(3_000)
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+function uniqueStrings(values: readonly (string | undefined)[]): string[] {
+  return [...new Set(values.filter((value): value is string => Boolean(value)))];
 }
