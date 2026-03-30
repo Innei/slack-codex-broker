@@ -162,141 +162,200 @@ function renderAdminPage(options: {
   <style>
     :root {
       color-scheme: dark;
-      --bg: #080808;
-      --panel: #0f0f0f;
-      --panel-2: #141414;
-      --line: rgba(255, 151, 47, 0.18);
-      --line-strong: rgba(255, 151, 47, 0.4);
-      --accent: #ff972f;
-      --text: #f5f1ea;
-      --muted: #9d8d77;
-      --good: #28d887;
-      --warn: #ffc14f;
-      --danger: #ff7158;
-      --mono: "IBM Plex Mono", "SF Mono", "JetBrains Mono", ui-monospace, monospace;
+      --bg: #ff962d;
+      --bg-deep: #d97414;
+      --panel: #070707;
+      --panel-soft: #0a0a0a;
+      --panel-strong: #030303;
+      --line: rgba(255, 154, 47, 0.15);
+      --line-strong: rgba(255, 154, 47, 0.34);
+      --text: #fff1de;
+      --muted: #a48f75;
+      --accent: #ff9a2f;
+      --accent-soft: rgba(255, 154, 47, 0.12);
+      --good: #34dd93;
+      --good-soft: rgba(52, 221, 147, 0.12);
+      --warn: #ffcb63;
+      --warn-soft: rgba(255, 203, 99, 0.14);
+      --danger: #ff7458;
+      --danger-soft: rgba(255, 116, 88, 0.14);
+      --mono: "IBM Plex Mono", "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+      --sans: "IBM Plex Mono", "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
     }
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
     body {
       margin: 0;
       min-height: 100vh;
       background:
-        radial-gradient(circle at top left, rgba(255, 151, 47, 0.18), transparent 20%),
-        linear-gradient(180deg, #151515 0%, #060606 100%);
+        radial-gradient(circle at 14% 12%, rgba(255, 198, 122, 0.32), transparent 18%),
+        radial-gradient(circle at 86% 10%, rgba(255, 206, 139, 0.22), transparent 16%),
+        linear-gradient(135deg, rgba(255,255,255,0.05) 0 4%, transparent 4% 14%, rgba(255,255,255,0.03) 14% 17%, transparent 17% 31%, rgba(255,255,255,0.04) 31% 35%, transparent 35% 100%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
       color: var(--text);
-      font-family: var(--mono);
-      font-size: 13px;
+      font-family: var(--sans);
+      letter-spacing: 0.01em;
       line-height: 1.45;
     }
-    .shell {
-      max-width: 1680px;
+    .shell,
+    .wrap {
+      max-width: 1720px;
       margin: 0 auto;
-      padding: 18px;
+      padding: 24px;
     }
-    .frame {
-      border: 1px solid var(--line-strong);
-      border-radius: 16px;
-      background: rgba(8, 8, 8, 0.96);
-      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
-      overflow: hidden;
+    .frame,
+    .dashboard {
+      border: 1px solid rgba(255, 154, 47, 0.24);
+      border-radius: 18px;
+      background:
+        linear-gradient(180deg, rgba(10, 10, 10, 0.995), rgba(3, 3, 3, 0.995));
+      box-shadow:
+        0 30px 70px rgba(92, 34, 0, 0.28),
+        inset 0 0 0 1px rgba(255,255,255,0.015);
+      padding: 16px;
     }
-    .topbar {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 16px;
-      align-items: end;
-      padding: 18px 20px 14px;
-      border-bottom: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(255, 151, 47, 0.06), rgba(255, 151, 47, 0.02));
-    }
-    .title {
+    h1,
+    h2,
+    h3 {
       margin: 0;
-      font-size: 24px;
       font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
+      letter-spacing: 0.02em;
     }
-    .subtitle {
-      margin-top: 6px;
-      color: var(--muted);
-      font-size: 11px;
+    h1 {
+      font-size: 22px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    h2 {
+      font-size: 13px;
       text-transform: uppercase;
       letter-spacing: 0.08em;
     }
-    .topbar-actions {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-      justify-content: flex-end;
+    h3 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
     }
-    .layout {
-      display: grid;
-      grid-template-columns: minmax(0, 1.75fr) minmax(360px, 0.95fr);
-      gap: 18px;
-      padding: 18px;
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
     }
-    .stack {
-      display: grid;
-      gap: 18px;
-      min-width: 0;
-    }
-    .panel {
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      overflow: hidden;
-      background: var(--panel);
-      min-width: 0;
-    }
-    .panel-head {
+    .topbar,
+    .headerbar {
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 12px;
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--line);
-      background: rgba(255, 151, 47, 0.03);
+      margin-bottom: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--line-strong);
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(255, 154, 47, 0.03), rgba(255, 154, 47, 0.01));
     }
-    .panel-title {
-      font-size: 12px;
+    .title,
+    .header-main {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+    .title {
+      margin: 0;
+      font-size: 22px;
       font-weight: 700;
-      color: var(--accent);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .subtitle,
+    .header-subtitle {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+      text-transform: uppercase;
+    }
+    .topbar-actions,
+    .header-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.75fr) minmax(380px, 0.95fr);
+      gap: 12px;
+      align-items: start;
+    }
+    .stack,
+    .main-stack,
+    .side-stack,
+    .overview-stack {
+      display: grid;
+      gap: 12px;
+    }
+    .summary-grid,
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .summary-item,
+    .summary-pill {
+      display: grid;
+      gap: 4px;
+      min-height: 82px;
+      padding: 10px 12px;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+    }
+    .summary-label,
+    .summary-pill-label {
+      color: var(--muted);
+      font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.08em;
+    }
+    .summary-value,
+    .summary-pill-value {
+      color: var(--accent);
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1.05;
+    }
+    .summary-detail,
+    .summary-pill-detail {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .card,
+    .panel {
+      background: rgba(7, 7, 7, 0.96);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.01);
+    }
+    .panel-head,
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    .panel-title,
+    .subpanel-title {
+      font-weight: 700;
+      word-break: break-word;
+      text-transform: uppercase;
     }
     .panel-body {
       padding: 14px;
-    }
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 1px;
-      background: var(--line);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    .summary-item {
-      min-height: 92px;
-      padding: 14px;
-      background: var(--panel-2);
-    }
-    .summary-label {
-      color: var(--muted);
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    .summary-value {
-      margin-top: 10px;
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--accent);
-    }
-    .summary-detail {
-      margin-top: 8px;
-      color: var(--muted);
-      font-size: 11px;
-      word-break: break-word;
     }
     .badge {
       display: inline-flex;
@@ -399,7 +458,7 @@ function renderAdminPage(options: {
       border: 1px solid var(--line);
       border-radius: 12px;
       padding: 12px;
-      background: var(--panel-2);
+      background: var(--panel-soft);
     }
     .profile-head, .file-head {
       display: flex;
@@ -561,7 +620,8 @@ function renderAdminPage(options: {
           <div class="subtitle">runtime, quota, auth profiles, sessions, logs</div>
         </div>
         <div class="topbar-actions">
-          <span class="badge ${options.tokenConfigured ? "good" : "warn"}">${options.tokenConfigured ? "token required" : "no admin token"}</span>
+          <span class="badge ${options.tokenConfigured ? "warn" : "good"}">${options.tokenConfigured ? "admin token enabled" : "cloudflare access"}</span>
+          <button id="refresh-button" class="secondary">refresh</button>
           <span id="last-refresh" class="badge muted">not synced</span>
         </div>
       </div>
@@ -610,7 +670,6 @@ function renderAdminPage(options: {
                   <option value="jobs">running jobs</option>
                   <option value="issues">failed jobs</option>
                 </select>
-                <button id="refresh-button" class="secondary">refresh</button>
               </div>
               <div id="sessions-panel"></div>
             </div>
@@ -626,18 +685,6 @@ function renderAdminPage(options: {
 
         <div class="stack">
           <section class="panel">
-            <div class="panel-head"><div class="panel-title">Control</div></div>
-            <div class="panel-body">
-              <div class="control-row">
-                <input id="token-input" type="password" placeholder="admin token" />
-                <button id="refresh-button-side">refresh</button>
-              </div>
-              <div id="token-status" class="summary-detail"></div>
-              <div id="replace-status" class="summary-detail"></div>
-            </div>
-          </section>
-
-          <section class="panel">
             <div class="panel-head"><div class="panel-title">Account Quota</div></div>
             <div id="account-card" class="panel-body"></div>
           </section>
@@ -648,6 +695,8 @@ function renderAdminPage(options: {
               <button id="open-add-profile-dialog">add profile</button>
             </div>
             <div class="panel-body">
+              <div id="token-status" class="summary-detail"></div>
+              <div id="replace-status" class="summary-detail"></div>
               <div id="auth-profiles-panel" class="profile-list"></div>
             </div>
           </section>
@@ -677,17 +726,14 @@ function renderAdminPage(options: {
   <script>
     const tokenKey = "broker-admin-token";
     const tokenConfigured = ${options.tokenConfigured ? "true" : "false"};
-    const tokenInput = document.getElementById("token-input");
     const tokenStatus = document.getElementById("token-status");
     const lastRefresh = document.getElementById("last-refresh");
     const replaceStatus = document.getElementById("replace-status");
     const sessionSearch = document.getElementById("session-search");
     const sessionFilter = document.getElementById("session-filter");
-    const refreshButtons = [document.getElementById("refresh-button"), document.getElementById("refresh-button-side")];
+    const refreshButton = document.getElementById("refresh-button");
     const addProfileDialog = document.getElementById("add-profile-dialog");
     let latestStatus = null;
-
-    tokenInput.value = localStorage.getItem(tokenKey) || "";
 
     function esc(value) {
       return String(value == null ? "" : value)
@@ -699,22 +745,14 @@ function renderAdminPage(options: {
     }
 
     function authHeaders(extra) {
-      const headers = Object.assign({}, extra || {});
-      const token = tokenInput.value.trim();
-      if (token) {
-        headers["x-admin-token"] = token;
-      }
-      return headers;
+      return Object.assign({}, extra || {});
     }
 
     function persistToken() {
-      localStorage.setItem(tokenKey, tokenInput.value.trim());
       if (!tokenConfigured) {
-        tokenStatus.innerHTML = '<span class="warn">admin api is unprotected</span>';
-      } else if (!tokenInput.value.trim()) {
-        tokenStatus.innerHTML = '<span class="warn">token required</span>';
+        tokenStatus.innerHTML = '<span class="good">protected by cloudflare access</span>';
       } else {
-        tokenStatus.innerHTML = '<span class="good">token ready</span>';
+        tokenStatus.innerHTML = '<span class="warn">admin token enabled on this runtime</span>';
       }
     }
 
@@ -1043,9 +1081,7 @@ function renderAdminPage(options: {
     }
 
     async function refresh() {
-      refreshButtons.forEach(function (button) {
-        button.disabled = true;
-      });
+      refreshButton.disabled = true;
       try {
         const response = await fetch("/admin/api/status", { headers: authHeaders() });
         const payload = await parseResponse(response);
@@ -1055,9 +1091,7 @@ function renderAdminPage(options: {
         const message = error instanceof Error ? error.message : String(error);
         lastRefresh.textContent = "error: " + message;
       } finally {
-        refreshButtons.forEach(function (button) {
-          button.disabled = false;
-        });
+        refreshButton.disabled = false;
       }
     }
 
@@ -1123,7 +1157,6 @@ function renderAdminPage(options: {
       }
     }
 
-    tokenInput.addEventListener("input", persistToken);
     sessionSearch.addEventListener("input", function () {
       if (latestStatus) {
         renderSessions(latestStatus);
@@ -1134,9 +1167,7 @@ function renderAdminPage(options: {
         renderSessions(latestStatus);
       }
     });
-    refreshButtons.forEach(function (button) {
-      button.addEventListener("click", refresh);
-    });
+    refreshButton.addEventListener("click", refresh);
 
     document.getElementById("open-add-profile-dialog").addEventListener("click", function () {
       document.getElementById("add-profile-status").textContent = "";
