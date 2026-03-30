@@ -17,6 +17,14 @@ const DEFAULT_COREPACK_PATH = "/opt/homebrew/opt/node@24/bin/corepack";
 const DEFAULT_CODEX_VERSION = "0.114.0";
 const DEFAULT_GEMINI_VERSION = "0.33.0";
 const DEFAULT_PNPM_VERSION = runCommand("pnpm", ["-v"], { capture: true });
+const REMOTE_SSH_ARGS = [
+  "-o",
+  "ConnectTimeout=10",
+  "-o",
+  "StrictHostKeyChecking=no",
+  "-o",
+  "UserKnownHostsFile=/dev/null"
+];
 
 const CODEX_HOST_HOME_ENTRIES = [
   "AGENT.md",
@@ -64,6 +72,10 @@ function getRemoteNodeBinDir(nodePath) {
 
 function getRemoteNpmPath(nodePath) {
   return path.posix.join(getRemoteNodeBinDir(nodePath), "npm");
+}
+
+function buildRsyncRemoteShell() {
+  return ["ssh", ...REMOTE_SSH_ARGS].map((part) => shellQuote(part)).join(" ");
 }
 
 function buildRemoteWsReadyCheckScript(port) {
@@ -276,7 +288,7 @@ function firstExistingPath(candidates) {
 async function runRemoteCommand(target, command, options = {}) {
   const result = spawnSync(
     "ssh",
-    ["-6", "-o", "ConnectTimeout=10", target, "bash", "-lc", shellQuote(command)],
+    [...REMOTE_SSH_ARGS, target, "bash", "-lc", shellQuote(command)],
     {
       encoding: "utf8",
       stdio: options.capture === false ? "inherit" : ["pipe", "pipe", "pipe"]
@@ -298,7 +310,7 @@ async function runRemoteCommand(target, command, options = {}) {
 async function writeRemoteFile(target, remotePath, content) {
   const result = spawnSync(
     "ssh",
-    ["-6", "-o", "ConnectTimeout=10", target, "bash", "-lc", shellQuote(`cat > ${shellQuote(remotePath)}`)],
+    [...REMOTE_SSH_ARGS, target, "bash", "-lc", shellQuote(`cat > ${shellQuote(remotePath)}`)],
     {
       encoding: "utf8",
       input: content,
@@ -733,57 +745,28 @@ async function createPortableBundle(sourceDataRoot, sourceHomes, env = {}) {
 
 async function syncPortableDirectory(target, sourcePath, destinationPath) {
   const parentDir = path.posix.dirname(destinationPath);
-  const remoteExtractCommand = `rm -rf ${destinationPath} && mkdir -p ${parentDir} && tar -xzf - -C ${parentDir}`;
-  const tar = spawn(
-    "tar",
-    ["-czf", "-", "-C", path.dirname(sourcePath), path.basename(sourcePath)],
-    { stdio: ["ignore", "pipe", "pipe"] }
-  );
-  const ssh = spawn(
-    "ssh",
-    ["-6", "-o", "ConnectTimeout=10", target, remoteExtractCommand],
-    { stdio: ["pipe", "inherit", "pipe"] }
-  );
+  await runRemoteCommand(target, `mkdir -p ${shellQuote(parentDir)} ${shellQuote(destinationPath)}`);
 
-  let tarStderr = "";
-  let sshStderr = "";
-  tar.stderr.on("data", (chunk) => {
-    tarStderr += chunk.toString("utf8");
-  });
-  ssh.stderr.on("data", (chunk) => {
-    sshStderr += chunk.toString("utf8");
-  });
-  ssh.stdin.on("error", (error) => {
-    if (error.code !== "EPIPE") {
-      sshStderr += `${error.message}\n`;
+  const result = spawnSync(
+    "rsync",
+    [
+      "-a",
+      "--delete",
+      "-e",
+      buildRsyncRemoteShell(),
+      `${sourcePath}/`,
+      `${target}:${destinationPath}/`
+    ],
+    {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"]
     }
-  });
-  tar.stdout.pipe(ssh.stdin);
-  tar.once("close", () => {
-    ssh.stdin.end();
-  });
+  );
 
-  const waitForExit = (child, label) =>
-    new Promise((resolve, reject) => {
-      child.once("error", reject);
-      child.once("close", (code, signal) => {
-        if (code === 0) {
-          resolve();
-          return;
-        }
-
-        reject(new Error(`${label} exited with ${code ?? "null"}${signal ? ` (${signal})` : ""}`));
-      });
-    });
-
-  try {
-    await Promise.all([waitForExit(tar, "tar"), waitForExit(ssh, "ssh")]);
-  } catch (error) {
-    tar.kill("SIGTERM");
-    ssh.kill("SIGTERM");
-    const details = [tarStderr.trim(), sshStderr.trim()].filter(Boolean).join("\n");
+  if (result.status !== 0) {
+    const details = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
     throw new Error(
-      `Failed to sync ${sourcePath} to ${target}:${destinationPath}: ${error.message}${details ? `\n${details}` : ""}`
+      `Failed to sync ${sourcePath} to ${target}:${destinationPath}: rsync exited with ${result.status ?? "null"}${details ? `\n${details}` : ""}`
     );
   }
 }
