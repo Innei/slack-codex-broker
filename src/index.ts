@@ -4,6 +4,7 @@ import { loadConfig } from "./config.js";
 import { createHttpHandler } from "./http/router.js";
 import { configureLogger, logger } from "./logger.js";
 import { AdminService } from "./services/admin-service.js";
+import { AuthProfileService } from "./services/auth-profile-service.js";
 import { CodexBroker } from "./services/codex/codex-broker.js";
 import { IsolatedMcpService } from "./services/codex/isolated-mcp-service.js";
 import { JobManager } from "./services/job-manager.js";
@@ -63,10 +64,14 @@ export async function startService(): Promise<{
       await bridge.acceptBackgroundJobEvent(event);
     }
   });
+  const authProfiles = new AuthProfileService({
+    config
+  });
   const adminService = new AdminService({
     config,
     sessions: sessionManager,
     codex: codexBroker,
+    authProfiles,
     startedAt
   });
   const server = http.createServer(

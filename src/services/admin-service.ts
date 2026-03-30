@@ -5,6 +5,15 @@ import type { AppConfig } from "../config.js";
 import type { SessionManager } from "./session-manager.js";
 import type { PersistedBackgroundJob, PersistedInboundMessage, SlackSessionRecord } from "../types.js";
 import type { CodexBroker } from "./codex/codex-broker.js";
+import type { AuthProfileService } from "./auth-profile-service.js";
+import {
+  serializeAccountError,
+  serializeAccountSummary,
+  serializeRateLimits,
+  serializeRateLimitsError,
+  type SerializedAccountStatus,
+  type SerializedRateLimitsStatus
+} from "./codex/account-status.js";
 
 interface FileInfo {
   readonly exists: boolean;
@@ -14,20 +23,15 @@ interface FileInfo {
 }
 
 export class AdminService {
-  readonly #dataRoot: string;
-  readonly #backupsRoot: string;
-
   constructor(
     private readonly options: {
       readonly config: AppConfig;
       readonly sessions: SessionManager;
       readonly codex: CodexBroker;
+      readonly authProfiles: AuthProfileService;
       readonly startedAt: Date;
     }
-  ) {
-    this.#dataRoot = path.dirname(this.options.config.stateDir);
-    this.#backupsRoot = path.join(this.#dataRoot, "admin-backups", "auth-switches");
-  }
+  ) {}
 
   getAdminUiBootstrap(): {
     readonly tokenConfigured: boolean;
@@ -64,6 +68,17 @@ export class AdminService {
       this.#readAccountSummary(),
       this.#readAccountRateLimits()
     ]);
+    const authProfiles = await this.options.authProfiles.listProfilesStatus({
+      activeSnapshot:
+        account.ok && rateLimits.ok
+          ? {
+              source: "runtime",
+              checkedAt: new Date().toISOString(),
+              account,
+              rateLimits
+            }
+          : undefined
+    });
     const backgroundJobCount = backgroundJobs.length;
     const runningBackgroundJobCount = backgroundJobs.filter((job) => job.status === "running").length;
     const failedBackgroundJobCount = backgroundJobs.filter((job) => job.status === "failed").length;
@@ -86,6 +101,7 @@ export class AdminService {
         credentialsJson: await this.#fileInfo(path.join(this.options.config.codexHome, ".credentials.json")),
         configToml: await this.#fileInfo(path.join(this.options.config.codexHome, "config.toml"))
       },
+      authProfiles,
       account,
       rateLimits,
       state: {
@@ -103,100 +119,63 @@ export class AdminService {
     };
   }
 
-  async replaceAuthFiles(options: {
-    readonly authJsonContent?: string | undefined;
-    readonly credentialsJsonContent?: string | undefined;
-    readonly configTomlContent?: string | undefined;
+  async addAuthProfile(options: {
+    readonly name: string;
+    readonly authJsonContent: string;
+  }): Promise<Record<string, unknown>> {
+    const profile = await this.options.authProfiles.addProfile(options);
+    return {
+      ok: true,
+      profile,
+      status: await this.getStatus()
+    };
+  }
+
+  async deleteAuthProfile(options: {
+    readonly name: string;
+  }): Promise<Record<string, unknown>> {
+    await this.options.authProfiles.deleteProfile(options.name);
+    return {
+      ok: true,
+      deletedProfile: options.name,
+      status: await this.getStatus()
+    };
+  }
+
+  async activateAuthProfile(options: {
+    readonly name: string;
     readonly allowActive: boolean;
   }): Promise<Record<string, unknown>> {
     const activeSessions = this.options.sessions.listSessions().filter((session) => Boolean(session.activeTurnId));
     if (!options.allowActive && activeSessions.length > 0) {
       throw new Error(
-        `Refusing auth replacement while active sessions exist (activeCount=${activeSessions.length}). Retry with allow_active=true if you really want to interrupt them.`
+        `Refusing auth profile switch while active sessions exist (activeCount=${activeSessions.length}). Retry with allow_active=true if you really want to interrupt them.`
       );
     }
 
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const backupDir = path.join(this.#backupsRoot, stamp);
-    const replacements = [
-      options.authJsonContent != null
-        ? {
-            relativePath: "auth.json",
-            content: options.authJsonContent
-          }
-        : null,
-      options.credentialsJsonContent != null
-        ? {
-            relativePath: ".credentials.json",
-            content: options.credentialsJsonContent
-          }
-        : null,
-      options.configTomlContent != null
-        ? {
-            relativePath: "config.toml",
-            content: options.configTomlContent
-          }
-        : null
-    ].filter((entry): entry is { relativePath: string; content: string } => entry != null);
-
-    if (replacements.length === 0) {
-      throw new Error("No auth files were provided to replace.");
-    }
-
-    const backups = [];
-    for (const replacement of replacements) {
-      const targetPath = path.join(this.options.config.codexHome, replacement.relativePath);
-      const backupPath = await this.#backupIfExists(targetPath, backupDir);
-      backups.push({
-        targetPath,
-        backupPath
-      });
-      await fs.mkdir(path.dirname(targetPath), { recursive: true });
-      await fs.writeFile(targetPath, replacement.content, "utf8");
-    }
-
-    await this.options.codex.restartRuntime("admin auth replacement");
-    const status = await this.getStatus();
-
+    const activated = await this.options.authProfiles.activateProfile(options.name);
+    await this.options.codex.restartRuntime(`admin auth profile switch: ${activated.name}`);
     return {
       ok: true,
-      backups,
-      replaced: replacements.map((entry) => ({
-        targetPath: path.join(this.options.config.codexHome, entry.relativePath)
-      })),
-      status
+      activatedProfile: activated.name,
+      activatedPath: activated.path,
+      status: await this.getStatus()
     };
   }
 
-  async #readAccountSummary(): Promise<Record<string, unknown>> {
+  async #readAccountSummary(): Promise<SerializedAccountStatus> {
     try {
-      const account = await this.options.codex.readAccountSummary(false);
-      return {
-        ok: true,
-        account: account.account ?? null,
-        requiresOpenaiAuth: account.requiresOpenaiAuth ?? false
-      };
+      return serializeAccountSummary(await this.options.codex.readAccountSummary(false));
     } catch (error) {
-      return {
-        ok: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return serializeAccountError(error);
     }
   }
 
-  async #readAccountRateLimits(): Promise<Record<string, unknown>> {
+  async #readAccountRateLimits(): Promise<SerializedRateLimitsStatus> {
     try {
-      const response = await this.options.codex.readAccountRateLimits();
-      return {
-        ok: true,
-        rateLimits: response.rateLimits,
-        rateLimitsByLimitId: response.rateLimitsByLimitId
-      };
+      return serializeRateLimits(await this.options.codex.readAccountRateLimits());
     } catch (error) {
-      return {
-        ok: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
+      return serializeRateLimitsError(error);
     }
   }
 
@@ -219,23 +198,6 @@ export class AdminService {
 
       throw error;
     }
-  }
-
-  async #backupIfExists(targetPath: string, backupDir: string): Promise<string | null> {
-    try {
-      await fs.access(targetPath);
-    } catch (error) {
-      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
-        return null;
-      }
-
-      throw error;
-    }
-
-    await fs.mkdir(backupDir, { recursive: true });
-    const backupPath = path.join(backupDir, path.basename(targetPath));
-    await fs.copyFile(targetPath, backupPath);
-    return backupPath;
   }
 
   async #readRecentBrokerLogs(limit: number): Promise<readonly unknown[]> {

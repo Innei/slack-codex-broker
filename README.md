@@ -184,6 +184,13 @@ What it does:
 - builds the repo on the target and runs the service from `dist/src/index.js`
 - writes a launchd agent at `~/Library/LaunchAgents/com.zzj3720.slack-codex-broker.plist`
 
+What it does **not** do:
+
+- it does not copy the live `.data` tree verbatim
+- it does not migrate `state/`, `sessions/`, `jobs/`, `logs/`, or `repos/`
+- it only uses `--source-data-root` as a convenient lookup root for `codex-home/` and `auth-profiles/`
+- then rebuilds a fresh runtime data root on the VM from that subset
+
 The macOS launcher reads an env file from `~/services/slack-codex-broker/config/broker.env`, so the bare-run path stays file-driven instead of embedding a giant plist environment block.
 
 By default, the staging logic uses:
@@ -204,7 +211,9 @@ The broker service itself now also exposes an in-container admin page:
 ```text
 GET /admin
 GET /admin/api/status
-POST /admin/api/replace-auth
+POST /admin/api/auth-profiles
+POST /admin/api/auth-profiles/:name/activate
+DELETE /admin/api/auth-profiles/:name
 ```
 
 If `BROKER_ADMIN_TOKEN` is set, `/admin/api/*` requires that token via either the UI token field, `x-admin-token`, or `Authorization: Bearer ...`. If it is unset, the admin API is still enabled, so only expose the broker port in environments you trust.
@@ -227,6 +236,23 @@ Inside the container:
 - session workspaces default to `/app/.data/sessions/<channel-thread>/workspace`
 - shared canonical repositories live under `/app/.data/repos`
 - structured logs default to `/app/.data/logs`
+
+In practice, `.data` is the broker's runtime data root. It contains both durable broker-owned identity/config data and disposable runtime state.
+
+Durable broker-owned identity/config data:
+
+- `codex-home/`
+- `auth-profiles/`
+
+Disposable runtime state:
+
+- `state/`
+- `sessions/`
+- `jobs/`
+- `logs/`
+- `repos/`
+
+The macOS bare-run deploy path only reuses the durable broker-owned subset that defines behavior and identity. It intentionally leaves the disposable runtime state behind and starts the VM with a clean `sessions/`, `jobs/`, `logs/`, and `repos/`.
 
 ## Logging
 

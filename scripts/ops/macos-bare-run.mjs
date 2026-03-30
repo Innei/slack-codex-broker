@@ -237,7 +237,7 @@ function printHelp() {
       "  --target <user@host>                SSH target, default admin@fd7a:115c:a1e0::c232:b25a",
       "  --remote-root <path>                Remote service root, default ~/services/slack-codex-broker",
       "  --container <name>                  Source Docker container name for live env/data inspection",
-      "  --source-data-root <path>           Override the source .data directory",
+      "  --source-data-root <path>           Override the source broker data root used to read codex-home/auth-profiles only",
       "  --source-codex-home <path>          Override the source Codex home snapshot",
       "  --source-gemini-home <path>         Override the source Gemini home snapshot",
       "  --source-agents-home <path>         Override the source .agents snapshot",

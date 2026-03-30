@@ -23,7 +23,9 @@ describe("admin routes", () => {
     } as NodeJS.ProcessEnv);
     const adminService = {
       getStatus: async () => ({ ok: true, status: "admin-ok" }),
-      replaceAuthFiles: async () => ({ ok: true })
+      addAuthProfile: async () => ({ ok: true }),
+      deleteAuthProfile: async () => ({ ok: true }),
+      activateAuthProfile: async () => ({ ok: true })
     };
 
     const server = http.createServer(
@@ -69,14 +71,16 @@ describe("admin routes", () => {
     });
   });
 
-  it("renders integrated auth file controls and collapsed session shells in the admin page", async () => {
+  it("renders auth profile management and session console sections in the admin page", async () => {
     const config = loadConfig({
       SLACK_APP_TOKEN: "xapp-test",
       SLACK_BOT_TOKEN: "xoxb-test"
     } as NodeJS.ProcessEnv);
     const adminService = {
       getStatus: async () => ({ ok: true, status: "admin-ok" }),
-      replaceAuthFiles: async () => ({ ok: true })
+      addAuthProfile: async () => ({ ok: true }),
+      deleteAuthProfile: async () => ({ ok: true }),
+      activateAuthProfile: async () => ({ ok: true })
     };
 
     const server = http.createServer(
@@ -110,16 +114,15 @@ describe("admin routes", () => {
     expect(page.status).toBe(200);
     const html = await page.text();
 
-    expect(html).toContain("open-auth-dialog");
-    expect(html).toContain("open-credentials-dialog");
-    expect(html).toContain("open-config-dialog");
+    expect(html).toContain("open-add-profile-dialog");
+    expect(html).toContain("auth-profiles-panel");
     expect(html).toContain("Account Quota");
-    expect(html).toContain("Auth Files");
+    expect(html).toContain("Auth Profiles");
     expect(html).toContain("Runtime Info");
-    expect(html).not.toContain("<h2>替换登录态</h2>");
-    expect(html).toContain("session-row");
+    expect(html).toContain("add-profile-dialog");
     expect(html).toContain("session-search");
-    expect(html).not.toContain("固定状态都压在这里");
+    expect(html).toContain("System Logs");
+    expect(html).not.toContain("/admin/api/runtime-files");
   });
 
   it("emits admin page inline script without syntax errors", async () => {
@@ -129,7 +132,9 @@ describe("admin routes", () => {
     } as NodeJS.ProcessEnv);
     const adminService = {
       getStatus: async () => ({ ok: true, status: "admin-ok" }),
-      replaceAuthFiles: async () => ({ ok: true })
+      addAuthProfile: async () => ({ ok: true }),
+      deleteAuthProfile: async () => ({ ok: true }),
+      activateAuthProfile: async () => ({ ok: true })
     };
 
     const server = http.createServer(

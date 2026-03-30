@@ -43,6 +43,15 @@ describe("AdminService", () => {
         listInboundMessages: () => [],
         listBackgroundJobs: () => []
       } as never,
+      authProfiles: {
+        listProfilesStatus: async () => ({
+          managedRoot: path.join(dataRoot, "auth-profiles"),
+          profilesRoot: path.join(dataRoot, "auth-profiles", "docker", "profiles"),
+          activeProfile: "primary",
+          activeAuthPath: path.join(config.codexHome, "auth.json"),
+          profiles: []
+        })
+      } as never,
       codex: {
         readAccountSummary: async () => ({
           account: {
@@ -125,6 +134,10 @@ describe("AdminService", () => {
             limitName: "Codex"
           }
         }
+      },
+      authProfiles: {
+        activeProfile: "primary",
+        profiles: []
       }
     });
   });
