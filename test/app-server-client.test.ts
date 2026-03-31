@@ -617,6 +617,21 @@ describe("AppServerClient disconnect handling", () => {
     expect(threadStartParams?.baseInstructions).toEqual(expect.stringContaining("channel_id: C123"));
     expect(threadStartParams?.baseInstructions).toEqual(expect.stringContaining("thread_ts: 111.222"));
     expect(threadStartParams?.baseInstructions).toEqual(expect.stringContaining("session_workspace: /tmp/workspace"));
+    expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining(`runtime_platform: ${process.platform}`)
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining(`runtime_hostname: ${os.hostname()}`)
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("runtime_containerized:")
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("Verify platform-specific app/runtime behavior from the runtime you can actually observe")
+    );
+    expect(threadStartParams?.baseInstructions).not.toEqual(
+      expect.stringContaining("You are running inside the broker's Linux Docker container, not on a macOS host.")
+    );
     expect(threadStartParams?.baseInstructions).toEqual(expect.stringContaining("~/.codex/AGENT.md"));
     expect(threadStartParams?.baseInstructions).toEqual(expect.stringContaining("remember this"));
     expect(threadStartParams?.baseInstructions).toEqual(expect.stringContaining("bot_user_id: U999"));
@@ -659,7 +674,7 @@ describe("AppServerClient disconnect handling", () => {
       expect.stringContaining("user explicitly asks you to do the UI work directly yourself")
     );
     expect(threadStartParams?.baseInstructions).toEqual(
-      expect.stringContaining("blocker for UI work only when the task is still on the default Gemini-first path")
+      expect.stringContaining("Gemini is unavailable right now and then continue the UI work yourself")
     );
     expect(threadStartParams?.baseInstructions).toEqual(
       expect.stringContaining("\"server\":\"linear\"")
@@ -710,6 +725,7 @@ describe("AppServerClient disconnect handling", () => {
     expect(threadStartParams?.baseInstructions).toEqual(
       expect.stringContaining("Do not store personal operating memory in repository AGENTS.md files")
     );
+    expect(String(threadStartParams?.baseInstructions)).not.toContain("{{");
     expect(threadResumeParams?.baseInstructions).toBeNull();
   });
 });
