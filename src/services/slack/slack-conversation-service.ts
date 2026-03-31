@@ -37,6 +37,7 @@ import {
   isSlackMessageAfterCursor,
   isStopExplainingTurnSignalKind,
   isUnexpectedTurnStopMessage,
+  shouldPostSlackRunFailure,
   shouldNotifySlackFailure,
   shouldAutoRecoverSession
 } from "./slack-conversation-utils.js";
@@ -1084,13 +1085,20 @@ export class SlackConversationService {
           error,
           nowMs
         })) {
-          await this.#postBotThreadMessage(
-            session.channelId,
-            session.rootThreadTs,
-            formatSlackRunFailureMessage(error)
-          );
-          runtime.lastFailureNotificationFingerprint = createSlackFailureFingerprint(error);
-          runtime.lastFailureNotificationAtMs = nowMs;
+          if (shouldPostSlackRunFailure(error)) {
+            await this.#postBotThreadMessage(
+              session.channelId,
+              session.rootThreadTs,
+              formatSlackRunFailureMessage(error)
+            );
+            runtime.lastFailureNotificationFingerprint = createSlackFailureFingerprint(error);
+            runtime.lastFailureNotificationAtMs = nowMs;
+          } else {
+            logger.info("Suppressing recoverable Slack reconnect notification", {
+              sessionKey,
+              error: error instanceof Error ? error.message : String(error)
+            });
+          }
         } else {
           logger.warn("Suppressing duplicate Slack run failure notification", {
             sessionKey,

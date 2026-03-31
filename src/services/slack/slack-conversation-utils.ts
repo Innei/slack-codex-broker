@@ -155,6 +155,10 @@ export function formatSlackRunFailureMessage(error: unknown): string {
   return "I hit an internal issue while working on this thread. Send a quick follow-up and I will continue from the latest state.";
 }
 
+export function shouldPostSlackRunFailure(error: unknown): boolean {
+  return !isRecoverableCodexTurnFailure(error);
+}
+
 export function isMissingActiveTurnSteerError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /no active turn to steer/i.test(message) || /expected active turn id `[^`]+` but found `[^`]+`/i.test(message);

@@ -6,6 +6,7 @@ import {
   isMissingCodexThreadError,
   isMissingActiveTurnSteerError,
   parseActiveTurnMismatch,
+  shouldPostSlackRunFailure,
   shouldNotifySlackFailure
 } from "../src/services/slack/slack-conversation-utils.js";
 
@@ -41,6 +42,10 @@ describe("slack conversation utils", () => {
     expect(formatSlackRunFailureMessage(new Error("Codex app-server websocket closed"))).toBe(
       "I lost my connection while working on this thread. I will resume as soon as the connection comes back."
     );
+  });
+
+  it("suppresses visible Slack notifications for recoverable websocket failures", () => {
+    expect(shouldPostSlackRunFailure(new Error("Codex app-server websocket closed"))).toBe(false);
   });
 
   it("formats active turn mismatches for Slack users", () => {
