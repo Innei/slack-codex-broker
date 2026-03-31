@@ -28,6 +28,7 @@ export async function startAdminService(): Promise<{
     stateStore,
     sessionsRoot: config.sessionsRoot
   });
+  await sessions.load();
   const authProfiles = new AuthProfileService({
     config
   });
