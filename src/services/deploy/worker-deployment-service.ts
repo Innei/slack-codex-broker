@@ -70,6 +70,8 @@ export class WorkerDeploymentService {
       readonly codexAppServerPort: number;
       readonly releaseRepoUrl?: string | undefined;
       readonly corepackPath?: string | undefined;
+      readonly healthCheckTimeoutMs?: number | undefined;
+      readonly healthCheckIntervalMs?: number | undefined;
       readonly exec?: typeof execCommand | undefined;
     }
   ) {}
@@ -295,10 +297,23 @@ export class WorkerDeploymentService {
   }
 
   async #assertWorkerHealthy(): Promise<void> {
-    const status = await this.#readWorkerHealth();
-    if (!status.launchdLoaded || !status.healthOk || !status.readyOk) {
+    const timeoutMs = this.options.healthCheckTimeoutMs ?? 20_000;
+    const intervalMs = this.options.healthCheckIntervalMs ?? 500;
+    const deadline = Date.now() + timeoutMs;
+    let lastStatus = await this.#readWorkerHealth();
+
+    while (Date.now() < deadline) {
+      if (lastStatus.launchdLoaded && lastStatus.healthOk && lastStatus.readyOk) {
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      lastStatus = await this.#readWorkerHealth();
+    }
+
+    if (!lastStatus.launchdLoaded || !lastStatus.healthOk || !lastStatus.readyOk) {
       throw new Error(
-        `Worker failed health checks: launchdLoaded=${status.launchdLoaded} healthOk=${status.healthOk} readyOk=${status.readyOk}${status.readyError ? ` readyError=${status.readyError}` : ""}`
+        `Worker failed health checks: launchdLoaded=${lastStatus.launchdLoaded} healthOk=${lastStatus.healthOk} readyOk=${lastStatus.readyOk}${lastStatus.readyError ? ` readyError=${lastStatus.readyError}` : ""}`
       );
     }
   }

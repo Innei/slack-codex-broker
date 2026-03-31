@@ -165,4 +165,147 @@ describe("WorkerDeploymentService", () => {
     expect(currentAfterRollback).toBe(path.join(releasesRoot, refs.get("main")!));
     expect(previousAfterRollback).toBe(path.join(releasesRoot, refs.get("previous")!));
   });
+
+  it("waits through transient worker health failures during deploy", async () => {
+    const serviceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "worker-deploy-health-"));
+    tempDirs.push(serviceRoot);
+
+    const repoRoot = path.join(serviceRoot, "repo");
+    const releasesRoot = path.join(serviceRoot, "releases");
+    const currentReleasePath = path.join(serviceRoot, "current");
+    const previousReleasePath = path.join(serviceRoot, "previous");
+    const failedReleasePath = path.join(serviceRoot, "failed");
+    const workerPlistPath = path.join(serviceRoot, "worker.plist");
+    await fs.mkdir(path.join(repoRoot, ".git"), { recursive: true });
+    await fs.mkdir(releasesRoot, { recursive: true });
+    await fs.writeFile(workerPlistPath, "<plist/>", "utf8");
+
+    let launchdLoaded = false;
+    let fetchCalls = 0;
+
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      fetchCalls += 1;
+      if (fetchCalls < 3) {
+        return {
+          ok: false,
+          text: async () => "fetch failed"
+        };
+      }
+
+      return {
+        ok: true,
+        text: async () => JSON.stringify({ ok: true })
+      };
+    }));
+    vi.stubGlobal(
+      "WebSocket",
+      class FakeWebSocket {
+        readonly #listeners = new Map<string, Array<() => void>>();
+
+        constructor() {
+          queueMicrotask(() => {
+            for (const listener of this.#listeners.get("open") ?? []) {
+              listener();
+            }
+          });
+        }
+
+        addEventListener(type: string, listener: () => void) {
+          const existing = this.#listeners.get(type) ?? [];
+          existing.push(listener);
+          this.#listeners.set(type, existing);
+        }
+
+        close() {}
+      }
+    );
+
+    const exec = vi.fn(async (command: string, args: readonly string[]) => {
+      if (command === "git" && args[0] === "-C" && args[2] === "fetch") {
+        return { stdout: "", stderr: "" };
+      }
+
+      if (command === "git" && args[0] === "-C" && args[2] === "remote") {
+        return { stdout: "", stderr: "" };
+      }
+
+      if (command === "git" && args[0] === "-C" && args[2] === "rev-parse") {
+        if (args[3] === "main^{commit}") {
+          return { stdout: "cccccccccccccccccccccccccccccccccccccccc\n", stderr: "" };
+        }
+
+        if (args[3] === "HEAD") {
+          const cwd = String(args[1]);
+          const revision = await fs.readFile(path.join(cwd, ".revision"), "utf8");
+          return { stdout: revision, stderr: "" };
+        }
+      }
+
+      if (command === "git" && args[0] === "-C" && args[2] === "branch") {
+        return { stdout: "main\n", stderr: "" };
+      }
+
+      if (command === "git" && args[0] === "-C" && args[2] === "worktree" && args[3] === "add") {
+        const releaseRoot = String(args[5]);
+        const revision = String(args[6]);
+        await fs.mkdir(path.join(releaseRoot, ".git"), { recursive: true });
+        await fs.writeFile(path.join(releaseRoot, ".revision"), `${revision}\n`, "utf8");
+        return { stdout: "", stderr: "" };
+      }
+
+      if (command === "corepack") {
+        return { stdout: "", stderr: "" };
+      }
+
+      if (command === "launchctl" && args[0] === "bootout") {
+        launchdLoaded = false;
+        return { stdout: "", stderr: "" };
+      }
+
+      if (command === "launchctl" && (args[0] === "bootstrap" || args[0] === "kickstart")) {
+        launchdLoaded = true;
+        return { stdout: "", stderr: "" };
+      }
+
+      if (command === "launchctl" && args[0] === "print") {
+        if (!launchdLoaded) {
+          throw new Error("not loaded");
+        }
+        return { stdout: "loaded\n", stderr: "" };
+      }
+
+      throw new Error(`Unexpected command: ${command} ${args.join(" ")}`);
+    });
+
+    const service = new WorkerDeploymentService({
+      serviceRoot,
+      repoRoot,
+      releasesRoot,
+      currentReleasePath,
+      previousReleasePath,
+      failedReleasePath,
+      workerPlistPath,
+      workerLaunchdLabel: "test.worker",
+      workerBaseUrl: "http://127.0.0.1:3001",
+      codexAppServerPort: 4590,
+      releaseRepoUrl: "https://example.com/repo.git",
+      healthCheckTimeoutMs: 50,
+      healthCheckIntervalMs: 1,
+      exec
+    });
+
+    await expect(service.deploy({ ref: "main" })).resolves.toMatchObject({
+      currentRelease: {
+        metadata: {
+          shortRevision: "cccccccccccc"
+        }
+      },
+      worker: {
+        healthOk: true,
+        readyOk: true
+      }
+    });
+    expect(fetchCalls).toBeGreaterThanOrEqual(3);
+    await expect(fs.readlink(failedReleasePath)).rejects.toMatchObject({ code: "ENOENT" });
+  });
 });
