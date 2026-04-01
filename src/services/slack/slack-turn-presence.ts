@@ -53,6 +53,7 @@ interface PresenceSlackApi {
     readonly recipientTeamId?: string | undefined;
     readonly markdownText?: string | undefined;
     readonly chunks?: readonly SlackStreamChunk[] | undefined;
+    readonly taskDisplayMode?: "timeline" | "plan" | undefined;
   }): Promise<string | undefined>;
   appendThreadStream(options: {
     readonly channelId: string;
@@ -320,7 +321,8 @@ export class SlackTurnPresence {
         recipientUserId: runtime.recipientUserId,
         recipientTeamId: runtime.recipientTeamId,
         markdownText: `思考步骤：\n- ${truncateLogLine(line)}`,
-        chunks: buildTimelineChunks(runtime)
+        chunks: buildTimelineChunks(runtime),
+        taskDisplayMode: "plan"
       });
 
       if (!ts) {

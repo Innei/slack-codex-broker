@@ -51,7 +51,8 @@ describe("SlackTurnPresence", () => {
       channelId: "C123",
       threadTs: "111.222",
       recipientUserId: "U123",
-      recipientTeamId: "T123"
+      recipientTeamId: "T123",
+      taskDisplayMode: "plan"
     }));
 
     await presence.noteTurnDelta("turn-1");

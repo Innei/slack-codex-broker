@@ -1,15 +1,16 @@
-import os from "node:os";
 import path from "node:path";
+import fs from "node:fs/promises";
 
 import { AppServerProcess } from "../../src/services/codex/app-server-process.js";
 import { AppServerClient } from "../../src/services/codex/app-server-client.js";
 
 async function main(): Promise<void> {
-  const codexHome = path.join(os.tmpdir(), `codex-smoke-${Date.now()}`);
+  const codexHome = path.join(process.cwd(), ".tmp", `codex-smoke-${Date.now()}`);
+  await fs.mkdir(codexHome, { recursive: true });
   const processManager = new AppServerProcess({
     codexHome,
     port: 4599,
-    authJsonPath: path.join(os.homedir(), ".codex", "auth.json")
+    authJsonPath: process.env.CODEX_AUTH_JSON_PATH?.trim() || path.join(process.env.HOME || "", ".codex", "auth.json")
   });
   const client = new AppServerClient({
     url: processManager.url,

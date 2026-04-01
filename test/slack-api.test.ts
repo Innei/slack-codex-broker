@@ -174,8 +174,13 @@ describe("SlackApi assistant status and streaming helpers", () => {
         expect(params.get("thread_ts")).toBe("111.222");
         expect(params.get("recipient_user_id")).toBe("U123");
         expect(params.get("recipient_team_id")).toBe("T123");
-        expect(params.get("markdown_text")).toBe("思考步骤：\n- 已开始分析上下文");
+        expect(params.get("task_display_mode")).toBe("plan");
+        expect(params.get("markdown_text")).toBeNull();
         expect(params.get("chunks")).toBe(JSON.stringify([
+          {
+            type: "markdown_text",
+            text: "思考步骤：\n- 已开始分析上下文"
+          },
           {
             type: "plan_update",
             title: "Thinking steps"
@@ -190,8 +195,12 @@ describe("SlackApi assistant status and streaming helpers", () => {
       if (url.endsWith("/chat.appendStream")) {
         expect(params.get("channel")).toBe("C123");
         expect(params.get("ts")).toBe("111.333");
-        expect(params.get("markdown_text")).toBe("\n- 已开始组织回复");
+        expect(params.get("markdown_text")).toBeNull();
         expect(params.get("chunks")).toBe(JSON.stringify([
+          {
+            type: "markdown_text",
+            text: "\n- 已开始组织回复"
+          },
           {
             type: "task_update",
             id: "reply",
@@ -208,7 +217,19 @@ describe("SlackApi assistant status and streaming helpers", () => {
       if (url.endsWith("/chat.stopStream")) {
         expect(params.get("channel")).toBe("C123");
         expect(params.get("ts")).toBe("111.333");
-        expect(params.get("markdown_text")).toBe("\n- 已发送最终回复");
+        expect(params.get("markdown_text")).toBeNull();
+        expect(params.get("chunks")).toBe(JSON.stringify([
+          {
+            type: "markdown_text",
+            text: "\n- 已发送最终回复"
+          },
+          {
+            type: "task_update",
+            id: "reply",
+            title: "整理回复",
+            status: "complete"
+          }
+        ]));
         return new Response(JSON.stringify({ ok: true, ts: "111.333" }), {
           status: 200,
           headers: { "content-type": "application/json" }
@@ -238,6 +259,7 @@ describe("SlackApi assistant status and streaming helpers", () => {
       recipientUserId: "U123",
       recipientTeamId: "T123",
       markdownText: "思考步骤：\n- 已开始分析上下文",
+      taskDisplayMode: "plan",
       chunks: [
         {
           type: "plan_update",
@@ -264,7 +286,15 @@ describe("SlackApi assistant status and streaming helpers", () => {
     await api.stopThreadStream({
       channelId: "C123",
       streamTs: "111.333",
-      markdownText: "\n- 已发送最终回复"
+      markdownText: "\n- 已发送最终回复",
+      chunks: [
+        {
+          type: "task_update",
+          id: "reply",
+          title: "整理回复",
+          status: "complete"
+        }
+      ]
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(4);

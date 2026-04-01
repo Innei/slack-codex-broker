@@ -138,7 +138,9 @@ export class SlackApi {
     readonly recipientTeamId?: string | undefined;
     readonly markdownText?: string | undefined;
     readonly chunks?: readonly SlackStreamChunk[] | undefined;
+    readonly taskDisplayMode?: "timeline" | "plan" | undefined;
   }): Promise<string | undefined> {
+    const streamPayload = buildSlackStreamPayload(options.markdownText, options.chunks);
     const response = await this.#post<{ ts?: string }>(
       "chat.startStream",
       {
@@ -146,8 +148,8 @@ export class SlackApi {
         thread_ts: options.threadTs,
         recipient_user_id: options.recipientUserId,
         recipient_team_id: options.recipientTeamId,
-        markdown_text: options.markdownText,
-        chunks: options.chunks
+        task_display_mode: options.taskDisplayMode,
+        ...streamPayload
       },
       this.#botToken
     );
@@ -161,13 +163,13 @@ export class SlackApi {
     readonly markdownText: string;
     readonly chunks?: readonly SlackStreamChunk[] | undefined;
   }): Promise<void> {
+    const streamPayload = buildSlackStreamPayload(options.markdownText, options.chunks);
     await this.#post(
       "chat.appendStream",
       {
         channel: options.channelId,
         ts: options.streamTs,
-        markdown_text: options.markdownText,
-        chunks: options.chunks
+        ...streamPayload
       },
       this.#botToken
     );
@@ -179,13 +181,13 @@ export class SlackApi {
     readonly markdownText?: string | undefined;
     readonly chunks?: readonly SlackStreamChunk[] | undefined;
   }): Promise<void> {
+    const streamPayload = buildSlackStreamPayload(options.markdownText, options.chunks);
     await this.#post(
       "chat.stopStream",
       {
         channel: options.channelId,
         ts: options.streamTs,
-        markdown_text: options.markdownText,
-        chunks: options.chunks
+        ...streamPayload
       },
       this.#botToken
     );
@@ -505,6 +507,40 @@ function encodeSlackBodyValue(value: unknown): string {
   }
 
   return JSON.stringify(value);
+}
+
+function buildSlackStreamPayload(
+  markdownText?: string | undefined,
+  chunks?: readonly SlackStreamChunk[] | undefined
+): Record<string, unknown> {
+  const normalizedMarkdownText = markdownText?.trim() ? markdownText : undefined;
+  const normalizedChunks = chunks?.length ? [...chunks] : undefined;
+
+  if (normalizedMarkdownText && normalizedChunks) {
+    return {
+      chunks: [
+        {
+          type: "markdown_text",
+          text: normalizedMarkdownText
+        } satisfies SlackMarkdownTextChunk,
+        ...normalizedChunks
+      ]
+    };
+  }
+
+  if (normalizedChunks) {
+    return {
+      chunks: normalizedChunks
+    };
+  }
+
+  if (normalizedMarkdownText) {
+    return {
+      markdown_text: normalizedMarkdownText
+    };
+  }
+
+  return {};
 }
 
 export function normalizeSlackImageAttachments(files: unknown): SlackImageAttachment[] {
