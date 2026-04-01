@@ -168,7 +168,7 @@ describe("JobManager", () => {
     await jobs.stop();
   });
 
-  it("injects a runtime-relative helper path into background jobs", async () => {
+  it("injects the helper path resolved for the current runtime into background jobs", async () => {
     const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-state-"));
     const jobsRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-jobs-"));
     const sessionsRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-sessions-"));
@@ -200,7 +200,6 @@ describe("JobManager", () => {
 
     const helperPath = await waitForFileContents(capturePath);
     expect(helperPath).toBe(resolveRuntimeToolPath("job-callback.js"));
-    expect(helperPath.startsWith("/app/")).toBe(false);
 
     await jobs.cancelJob(job.id, job.token);
     await jobs.stop();

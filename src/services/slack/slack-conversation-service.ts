@@ -46,6 +46,7 @@ import {
   formatSlackHistoryContextForCodex
 } from "./slack-message-format.js";
 import { SlackSelfMessageFilter } from "./slack-self-filter.js";
+import { SlackTurnPresence } from "./slack-turn-presence.js";
 import { SlackTurnReconciler } from "./slack-turn-reconciler.js";
 import { SlackTurnRunner } from "./slack-turn-runner.js";
 
@@ -72,12 +73,14 @@ export class SlackConversationService {
   readonly #config: AppConfig;
   readonly #sessions: SessionManager;
   readonly #slackApi: SlackApi;
+  readonly #turnPresence: SlackTurnPresence;
   readonly #selfMessageFilter: SlackSelfMessageFilter;
   readonly #runtimeSessions = new Map<string, RuntimeSessionState>();
   readonly #inboundStore: SlackInboundStore;
   readonly #turnRunner: SlackTurnRunner;
   readonly #turnReconciler: SlackTurnReconciler;
   #botUserId = "";
+  #slackTeamId: string | undefined;
   #activeTurnReconcileTimer: NodeJS.Timeout | undefined;
   #catchUpPromise: Promise<void> | undefined;
   #lastMissedThreadRecoveryAtMs = 0;
@@ -93,6 +96,10 @@ export class SlackConversationService {
     this.#sessions = options.sessions;
     this.#slackApi = options.slackApi;
     this.#selfMessageFilter = options.selfMessageFilter;
+    this.#turnPresence = new SlackTurnPresence({
+      sessions: this.#sessions,
+      slackApi: this.#slackApi
+    });
     this.#inboundStore = new SlackInboundStore({
       sessions: this.#sessions,
       slackApi: this.#slackApi
@@ -108,10 +115,17 @@ export class SlackConversationService {
       turnRunner: this.#turnRunner,
       inboundStore: this.#inboundStore
     });
+    options.codex.on("turn_delta", (payload: { turnId: string }) => {
+      void this.#turnPresence.noteTurnDelta(payload.turnId);
+    });
   }
 
   setBotUserId(botUserId: string): void {
     this.#botUserId = botUserId;
+  }
+
+  setSlackTeamId(teamId: string | undefined): void {
+    this.#slackTeamId = teamId?.trim() || undefined;
   }
 
   async start(): Promise<void> {
@@ -123,6 +137,7 @@ export class SlackConversationService {
 
   async stop(): Promise<void> {
     this.#stopActiveTurnReconciler();
+    await this.#turnPresence.stop();
     for (const runtime of this.#runtimeSessions.values()) {
       if (!runtime.autoResumeTimer) {
         continue;
@@ -352,6 +367,16 @@ export class SlackConversationService {
             : undefined
       });
     }
+
+    const session = this.#sessions.getSession(options.channelId, options.rootThreadTs);
+    if (session) {
+      await this.#turnPresence.noteSlackMessage({
+        session,
+        kind: options.kind,
+        text: options.text,
+        reason: options.reason
+      });
+    }
   }
 
   async postSlackState(options: {
@@ -370,6 +395,11 @@ export class SlackConversationService {
       kind: options.kind,
       reason: options.reason,
       occurredAt: new Date().toISOString()
+    });
+    await this.#turnPresence.noteSlackMessage({
+      session,
+      kind: options.kind,
+      reason: options.reason
     });
   }
 
@@ -519,6 +549,7 @@ export class SlackConversationService {
     await this.#turnRunner.interrupt(session);
     await this.#inboundStore.markTurnBatchDone(session, session.activeTurnId);
     await this.#sessions.setActiveTurnId(session.channelId, session.rootThreadTs, undefined);
+    await this.#turnPresence.clearSession(session);
     return true;
   }
 
@@ -595,6 +626,7 @@ export class SlackConversationService {
       try {
         const outcome = await this.#reconcileSingleActiveTurn(session);
         if (outcome === "retained") {
+          await this.#turnPresence.refreshSession(this.#findSessionByKey(session.key));
           await this.#maybeRemindSilentActiveTurn(this.#findSessionByKey(session.key));
         }
       } catch (error) {
@@ -617,6 +649,7 @@ export class SlackConversationService {
     const outcome = await this.#turnReconciler.reconcileSingleActiveTurn(session);
 
     if (outcome === "cleared") {
+      await this.#turnPresence.clearSession(session);
       this.#resetRuntimeProcessing(session.key);
       await this.#resumePendingDispatch(session.key);
     }
@@ -1049,7 +1082,15 @@ export class SlackConversationService {
           sessionKey,
           senderUserId: slackInput.userId,
           input,
-          messageTsList: dispatchMessages.map((message) => message.messageTs)
+          messageTsList: dispatchMessages.map((message) => message.messageTs),
+          onTurnStarted: async ({ session: startedSession, turnId }) => {
+            await this.#turnPresence.beginTurn({
+              session: startedSession,
+              turnId,
+              recipientUserId: this.#resolvePresenceRecipientUserId(slackInput),
+              recipientTeamId: this.#slackTeamId
+            });
+          }
         });
 
         if (runtime.generation !== generation) {
@@ -1058,6 +1099,11 @@ export class SlackConversationService {
 
         session = turnOutcome.session;
         const result = turnOutcome.result;
+        await this.#turnPresence.noteTurnResult({
+          session,
+          turnId: result.turnId,
+          aborted: result.aborted
+        });
         logger.debug("Codex turn finished without broker-managed Slack reply forwarding", {
           sessionKey,
           turnId: result.turnId,
@@ -1078,6 +1124,10 @@ export class SlackConversationService {
           rootThreadTs: session.rootThreadTs,
           error: error instanceof Error ? error.message : String(error)
         });
+        await this.#turnPresence.failSession(
+          session,
+          error instanceof Error ? error.message : String(error)
+        );
         const nowMs = Date.now();
         if (shouldNotifySlackFailure({
           previousFingerprint: runtime.lastFailureNotificationFingerprint,
@@ -1316,5 +1366,15 @@ export class SlackConversationService {
       this.#config.slackActiveTurnReconcileIntervalMs
     );
     return Date.now() - this.#lastMissedThreadRecoveryAtMs >= intervalMs;
+  }
+
+  #resolvePresenceRecipientUserId(input: SlackInputMessage): string | undefined {
+    if (input.senderKind === "user" && !input.userId.startsWith("bot:") && !input.userId.startsWith("app:")) {
+      return input.userId;
+    }
+
+    return [...(input.batchMessages ?? [])]
+      .reverse()
+      .find((message) => message.sender?.userId)?.sender?.userId;
   }
 }

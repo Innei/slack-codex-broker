@@ -151,6 +151,126 @@ describe("SlackApi.uploadThreadFile", () => {
   });
 });
 
+describe("SlackApi assistant status and streaming helpers", () => {
+  it("serializes loading messages and stream chunks as JSON payloads", async () => {
+    const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      const body = String(init?.body);
+      const params = new URLSearchParams(body);
+
+      if (url.endsWith("/assistant.threads.setStatus")) {
+        expect(params.get("channel_id")).toBe("C123");
+        expect(params.get("thread_ts")).toBe("111.222");
+        expect(params.get("status")).toBe("is thinking…");
+        expect(params.get("loading_messages")).toBe(JSON.stringify(["正在理解请求", "正在查看上下文"]));
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      }
+
+      if (url.endsWith("/chat.startStream")) {
+        expect(params.get("channel")).toBe("C123");
+        expect(params.get("thread_ts")).toBe("111.222");
+        expect(params.get("recipient_user_id")).toBe("U123");
+        expect(params.get("recipient_team_id")).toBe("T123");
+        expect(params.get("markdown_text")).toBe("思考步骤：\n- 已开始分析上下文");
+        expect(params.get("chunks")).toBe(JSON.stringify([
+          {
+            type: "plan_update",
+            title: "Thinking steps"
+          }
+        ]));
+        return new Response(JSON.stringify({ ok: true, ts: "111.333" }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      }
+
+      if (url.endsWith("/chat.appendStream")) {
+        expect(params.get("channel")).toBe("C123");
+        expect(params.get("ts")).toBe("111.333");
+        expect(params.get("markdown_text")).toBe("\n- 已开始组织回复");
+        expect(params.get("chunks")).toBe(JSON.stringify([
+          {
+            type: "task_update",
+            id: "reply",
+            title: "整理回复",
+            status: "in_progress"
+          }
+        ]));
+        return new Response(JSON.stringify({ ok: true, ts: "111.333" }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      }
+
+      if (url.endsWith("/chat.stopStream")) {
+        expect(params.get("channel")).toBe("C123");
+        expect(params.get("ts")).toBe("111.333");
+        expect(params.get("markdown_text")).toBe("\n- 已发送最终回复");
+        return new Response(JSON.stringify({ ok: true, ts: "111.333" }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      }
+
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const api = new SlackApi({
+      baseUrl: "https://slack.test/api",
+      appToken: "xapp-test",
+      botToken: "xoxb-test"
+    });
+
+    await api.setAssistantThreadStatus({
+      channelId: "C123",
+      threadTs: "111.222",
+      status: "is thinking…",
+      loadingMessages: ["正在理解请求", "正在查看上下文"]
+    });
+
+    const streamTs = await api.startThreadStream({
+      channelId: "C123",
+      threadTs: "111.222",
+      recipientUserId: "U123",
+      recipientTeamId: "T123",
+      markdownText: "思考步骤：\n- 已开始分析上下文",
+      chunks: [
+        {
+          type: "plan_update",
+          title: "Thinking steps"
+        }
+      ]
+    });
+    expect(streamTs).toBe("111.333");
+
+    await api.appendThreadStream({
+      channelId: "C123",
+      streamTs: "111.333",
+      markdownText: "\n- 已开始组织回复",
+      chunks: [
+        {
+          type: "task_update",
+          id: "reply",
+          title: "整理回复",
+          status: "in_progress"
+        }
+      ]
+    });
+
+    await api.stopThreadStream({
+      channelId: "C123",
+      streamTs: "111.333",
+      markdownText: "\n- 已发送最终回复"
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+});
+
 describe("SlackApi.listThreadMessages", () => {
   it("preserves bot/app card messages with raw Slack payload", async () => {
     const fetchMock = vi.fn(async (input: string | URL) => {

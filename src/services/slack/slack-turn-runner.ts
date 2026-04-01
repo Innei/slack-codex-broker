@@ -81,6 +81,10 @@ export class SlackTurnRunner {
     readonly senderUserId: string;
     readonly input: readonly CodexInputItem[];
     readonly messageTsList: readonly string[];
+    readonly onTurnStarted?: ((options: {
+      readonly session: SlackSessionRecord;
+      readonly turnId: string;
+    }) => Promise<void> | void) | undefined;
   }): Promise<{
     readonly session: SlackSessionRecord;
     readonly result: CodexTurnResult;
@@ -101,6 +105,20 @@ export class SlackTurnRunner {
         session.rootThreadTs,
         startedTurn.turnId
       );
+      if (options.onTurnStarted) {
+        try {
+          await options.onTurnStarted({
+            session,
+            turnId: startedTurn.turnId
+          });
+        } catch (error) {
+          logger.warn("Slack turn start hook failed", {
+            sessionKey: options.sessionKey,
+            turnId: startedTurn.turnId,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
 
       try {
         const result = await startedTurn.completion;

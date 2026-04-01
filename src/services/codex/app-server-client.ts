@@ -43,6 +43,13 @@ interface ActiveTurn {
   reject: (error: Error) => void;
 }
 
+interface BufferedTurnNotification {
+  text: string;
+  terminal?: {
+    readonly aborted: boolean;
+  } | undefined;
+}
+
 export interface StartedTurn {
   readonly turnId: string;
   readonly completion: Promise<CodexTurnResult>;
@@ -118,6 +125,7 @@ export class AppServerClient extends EventEmitter {
   #requestCounter = 0;
   readonly #pendingRequests = new Map<string, PendingRequest>();
   readonly #activeTurns = new Map<string, ActiveTurn>();
+  readonly #bufferedTurnNotifications = new Map<string, BufferedTurnNotification>();
   #connected = false;
   #disconnectHandled = false;
   #slackBotIdentity: SlackUserIdentity | null = null;
@@ -342,16 +350,29 @@ export class AppServerClient extends EventEmitter {
     } as unknown as JsonValue) as {
       turn: { id: string };
     };
+    const buffered = this.#bufferedTurnNotifications.get(result.turn.id);
 
     const completion = new Promise<CodexTurnResult>((resolve, reject) => {
-      this.#activeTurns.set(result.turn.id, {
+      const activeTurn: ActiveTurn = {
         threadId,
         turnId: result.turn.id,
-        text: "",
+        text: buffered?.text ?? "",
         resolve,
         reject
-      });
+      };
+      this.#activeTurns.set(result.turn.id, activeTurn);
+
+      if (buffered?.terminal) {
+        this.#activeTurns.delete(result.turn.id);
+        resolve({
+          threadId,
+          turnId: result.turn.id,
+          finalMessage: activeTurn.text.trim(),
+          aborted: buffered.terminal.aborted
+        });
+      }
     });
+    this.#bufferedTurnNotifications.delete(result.turn.id);
 
     return {
       turnId: result.turn.id,
@@ -564,7 +585,17 @@ export class AppServerClient extends EventEmitter {
     if (method === "item/agentMessage/delta") {
       const turn = this.#activeTurns.get(params.turnId as string);
       if (turn) {
-        turn.text += String(params.delta ?? "");
+        const delta = String(params.delta ?? "");
+        turn.text += delta;
+        this.emit("turn_delta", {
+          threadId: turn.threadId,
+          turnId: params.turnId as string,
+          delta,
+          text: turn.text
+        });
+      } else {
+        const buffered = this.#getOrCreateBufferedTurnNotification(params.turnId as string);
+        buffered.text += String(params.delta ?? "");
       }
       return;
     }
@@ -577,6 +608,9 @@ export class AppServerClient extends EventEmitter {
 
       const turn = this.#activeTurns.get(turnId);
       if (!turn) {
+        this.#getOrCreateBufferedTurnNotification(turnId).terminal = {
+          aborted: false
+        };
         return;
       }
 
@@ -598,6 +632,9 @@ export class AppServerClient extends EventEmitter {
 
       const turn = this.#activeTurns.get(turnId);
       if (!turn) {
+        this.#getOrCreateBufferedTurnNotification(turnId).terminal = {
+          aborted: true
+        };
         return;
       }
 
@@ -709,6 +746,19 @@ export class AppServerClient extends EventEmitter {
 
     clearInterval(this.#heartbeatTimer);
     this.#heartbeatTimer = undefined;
+  }
+
+  #getOrCreateBufferedTurnNotification(turnId: string): BufferedTurnNotification {
+    const existing = this.#bufferedTurnNotifications.get(turnId);
+    if (existing) {
+      return existing;
+    }
+
+    const created: BufferedTurnNotification = {
+      text: ""
+    };
+    this.#bufferedTurnNotifications.set(turnId, created);
+    return created;
   }
 }
 

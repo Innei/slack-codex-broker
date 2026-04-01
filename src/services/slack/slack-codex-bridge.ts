@@ -63,6 +63,7 @@ export class SlackCodexBridge {
     this.#botUserId = auth.userId;
     this.#selfMessageFilter.setIdentity(auth);
     this.#conversations.setBotUserId(auth.userId);
+    this.#conversations.setSlackTeamId(auth.teamId);
 
     this.#botIdentity = await this.#slackApi.getUserIdentity(this.#botUserId);
     this.#codex.setSlackBotIdentity(this.#botIdentity);

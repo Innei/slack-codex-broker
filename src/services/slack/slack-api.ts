@@ -11,12 +11,45 @@ interface SlackApiResponse<T> {
   readonly ok: boolean;
   readonly error?: string;
   readonly url?: string;
+  readonly team_id?: string;
   readonly user_id?: string;
   readonly bot_id?: string;
   readonly app_id?: string;
+  readonly channel?: string;
   readonly ts?: string;
   readonly message?: T;
 }
+
+export interface SlackStreamSource {
+  readonly type: "url";
+  readonly text: string;
+  readonly url: string;
+}
+
+export interface SlackMarkdownTextChunk {
+  readonly type: "markdown_text";
+  readonly text: string;
+}
+
+export interface SlackTaskUpdateChunk {
+  readonly type: "task_update";
+  readonly id: string;
+  readonly title: string;
+  readonly status: "pending" | "in_progress" | "complete" | "error";
+  readonly details?: string | undefined;
+  readonly output?: string | undefined;
+  readonly sources?: readonly SlackStreamSource[] | undefined;
+}
+
+export interface SlackPlanUpdateChunk {
+  readonly type: "plan_update";
+  readonly title: string;
+}
+
+export type SlackStreamChunk =
+  | SlackMarkdownTextChunk
+  | SlackTaskUpdateChunk
+  | SlackPlanUpdateChunk;
 
 export interface SlackUploadedFile {
   readonly fileId: string;
@@ -57,10 +90,12 @@ export class SlackApi {
 
   async authTest(): Promise<{
     readonly userId: string;
+    readonly teamId?: string | undefined;
     readonly botId?: string | undefined;
     readonly appId?: string | undefined;
   }> {
     const response = await this.#post<{
+      team_id?: string;
       user_id: string;
       bot_id?: string;
       app_id?: string;
@@ -72,9 +107,88 @@ export class SlackApi {
 
     return {
       userId: response.user_id,
+      teamId: normalizeSlackField(response.team_id),
       botId: normalizeSlackField(response.bot_id),
       appId: normalizeSlackField(response.app_id)
     };
+  }
+
+  async setAssistantThreadStatus(options: {
+    readonly channelId: string;
+    readonly threadTs: string;
+    readonly status: string;
+    readonly loadingMessages?: readonly string[] | undefined;
+  }): Promise<void> {
+    await this.#post(
+      "assistant.threads.setStatus",
+      {
+        channel_id: options.channelId,
+        thread_ts: options.threadTs,
+        status: options.status,
+        loading_messages: options.loadingMessages?.slice(0, 10)
+      },
+      this.#botToken
+    );
+  }
+
+  async startThreadStream(options: {
+    readonly channelId: string;
+    readonly threadTs: string;
+    readonly recipientUserId?: string | undefined;
+    readonly recipientTeamId?: string | undefined;
+    readonly markdownText?: string | undefined;
+    readonly chunks?: readonly SlackStreamChunk[] | undefined;
+  }): Promise<string | undefined> {
+    const response = await this.#post<{ ts?: string }>(
+      "chat.startStream",
+      {
+        channel: options.channelId,
+        thread_ts: options.threadTs,
+        recipient_user_id: options.recipientUserId,
+        recipient_team_id: options.recipientTeamId,
+        markdown_text: options.markdownText,
+        chunks: options.chunks
+      },
+      this.#botToken
+    );
+
+    return response.ts;
+  }
+
+  async appendThreadStream(options: {
+    readonly channelId: string;
+    readonly streamTs: string;
+    readonly markdownText: string;
+    readonly chunks?: readonly SlackStreamChunk[] | undefined;
+  }): Promise<void> {
+    await this.#post(
+      "chat.appendStream",
+      {
+        channel: options.channelId,
+        ts: options.streamTs,
+        markdown_text: options.markdownText,
+        chunks: options.chunks
+      },
+      this.#botToken
+    );
+  }
+
+  async stopThreadStream(options: {
+    readonly channelId: string;
+    readonly streamTs: string;
+    readonly markdownText?: string | undefined;
+    readonly chunks?: readonly SlackStreamChunk[] | undefined;
+  }): Promise<void> {
+    await this.#post(
+      "chat.stopStream",
+      {
+        channel: options.channelId,
+        ts: options.streamTs,
+        markdown_text: options.markdownText,
+        chunks: options.chunks
+      },
+      this.#botToken
+    );
   }
 
   async postThreadMessage(channel: string, threadTs: string, text: string): Promise<string | undefined> {
@@ -352,7 +466,7 @@ export class SlackApi {
         continue;
       }
 
-      encodedBody.set(key, String(value));
+      encodedBody.set(key, encodeSlackBodyValue(value));
     }
 
     const response = await fetch(`${this.#baseUrl}/${path}`, {
@@ -376,6 +490,21 @@ export class SlackApi {
 
     return payload;
   }
+}
+
+function encodeSlackBodyValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return String(value);
+  }
+
+  return JSON.stringify(value);
 }
 
 export function normalizeSlackImageAttachments(files: unknown): SlackImageAttachment[] {
