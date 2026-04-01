@@ -921,7 +921,11 @@ async function startBrokerProcess(options: {
   readonly logs: readonly string[];
 }> {
   const logs: string[] = [];
-  const child = spawn("pnpm", ["exec", "tsx", "src/index.ts"], {
+  const packageRunner = process.env.COREPACK_BINARY?.trim() || "corepack";
+  const packageRunnerArgs = packageRunner === "pnpm"
+    ? ["exec", "tsx", "src/index.ts"]
+    : ["pnpm", "exec", "tsx", "src/index.ts"];
+  const child = spawn(packageRunner, packageRunnerArgs, {
     cwd: brokerRoot,
     env: {
       ...process.env,

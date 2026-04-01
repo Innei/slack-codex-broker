@@ -193,6 +193,22 @@ export class SlackApi {
     );
   }
 
+  async addReaction(options: {
+    readonly channelId: string;
+    readonly messageTs: string;
+    readonly name: string;
+  }): Promise<void> {
+    await this.#post(
+      "reactions.add",
+      {
+        channel: options.channelId,
+        timestamp: options.messageTs,
+        name: options.name
+      },
+      this.#botToken
+    );
+  }
+
   async postThreadMessage(channel: string, threadTs: string, text: string): Promise<string | undefined> {
     const response = await this.#post<{ ts?: string }>(
       "chat.postMessage",

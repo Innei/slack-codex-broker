@@ -68,6 +68,7 @@ interface PendingDispatchRequest {
 
 const AUTO_RESUME_AFTER_FAILURE_MS = 5_000;
 const NONRECOVERABLE_DISPATCH_RETRY_COOLDOWN_MS = 5 * 60 * 1_000;
+const INBOUND_ACK_REACTION = "eyes";
 
 export class SlackConversationService {
   readonly #config: AppConfig;
@@ -84,6 +85,7 @@ export class SlackConversationService {
   #activeTurnReconcileTimer: NodeJS.Timeout | undefined;
   #catchUpPromise: Promise<void> | undefined;
   #lastMissedThreadRecoveryAtMs = 0;
+  #inboundAckReactionDisabled = false;
 
   constructor(options: {
     readonly config: AppConfig;
@@ -564,8 +566,40 @@ export class SlackConversationService {
     }
 
     this.#clearDispatchFailureBlock(session.key);
+    await this.#acknowledgeInboundMessage(session, item);
     const recordedSession = await this.#inboundStore.recordInboundMessage(session, item);
     await this.#dispatchPersistedMessage(recordedSession, item.messageTs);
+  }
+
+  async #acknowledgeInboundMessage(session: SlackSessionRecord, item: SlackInputMessage): Promise<void> {
+    if (this.#inboundAckReactionDisabled || !item.messageTs || item.senderKind !== "user") {
+      return;
+    }
+
+    try {
+      await this.#slackApi.addReaction({
+        channelId: session.channelId,
+        messageTs: item.messageTs,
+        name: INBOUND_ACK_REACTION
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes("missing_scope")) {
+        this.#inboundAckReactionDisabled = true;
+        logger.info("Disabling inbound Slack reaction acknowledgements until reactions:write is granted", {
+          sessionKey: session.key,
+          reaction: INBOUND_ACK_REACTION
+        });
+        return;
+      }
+
+      logger.warn("Failed to add inbound Slack acknowledgement reaction", {
+        sessionKey: session.key,
+        messageTs: item.messageTs,
+        reaction: INBOUND_ACK_REACTION,
+        error: message
+      });
+    }
   }
 
   async #reconcilePersistedActiveTurns(): Promise<void> {

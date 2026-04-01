@@ -236,6 +236,16 @@ describe("SlackApi assistant status and streaming helpers", () => {
         });
       }
 
+      if (url.endsWith("/reactions.add")) {
+        expect(params.get("channel")).toBe("C123");
+        expect(params.get("timestamp")).toBe("111.444");
+        expect(params.get("name")).toBe("eyes");
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      }
+
       throw new Error(`Unexpected fetch ${url}`);
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -297,7 +307,13 @@ describe("SlackApi assistant status and streaming helpers", () => {
       ]
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    await api.addReaction({
+      channelId: "C123",
+      messageTs: "111.444",
+      name: "eyes"
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(5);
   });
 });
 

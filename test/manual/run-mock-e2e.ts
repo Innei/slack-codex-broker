@@ -16,30 +16,30 @@ async function main(): Promise<void> {
   const slackPort = await mockSlack.start();
   await fs.mkdir(reposRoot, { recursive: true });
 
-  const child = spawn(
-    "pnpm",
-    ["exec", "tsx", "src/index.ts"],
-    {
-      cwd: path.resolve(""),
-      env: {
-        ...process.env,
-        SLACK_APP_TOKEN: "xapp-test",
-        SLACK_BOT_TOKEN: "xoxb-test",
-        SLACK_API_BASE_URL: `http://127.0.0.1:${slackPort}/api`,
-        SLACK_SOCKET_OPEN_URL: "apps.connections.open",
-        SLACK_INITIAL_THREAD_HISTORY_COUNT: "1",
-        SLACK_HISTORY_API_MAX_LIMIT: "20",
-        STATE_DIR: stateDir,
-        SESSIONS_ROOT: sessionsRoot,
-        REPOS_ROOT: reposRoot,
-        CODEX_HOME: codexHome,
-        CODEX_AUTH_JSON_PATH: path.join(os.homedir(), ".codex", "auth.json"),
-        PORT: "3300",
-        DEBUG: "1"
-      },
-      stdio: ["ignore", "pipe", "pipe"]
-    }
-  );
+  const packageRunner = process.env.COREPACK_BINARY?.trim() || "corepack";
+  const packageRunnerArgs = packageRunner === "pnpm"
+    ? ["exec", "tsx", "src/index.ts"]
+    : ["pnpm", "exec", "tsx", "src/index.ts"];
+  const child = spawn(packageRunner, packageRunnerArgs, {
+    cwd: path.resolve(""),
+    env: {
+      ...process.env,
+      SLACK_APP_TOKEN: "xapp-test",
+      SLACK_BOT_TOKEN: "xoxb-test",
+      SLACK_API_BASE_URL: `http://127.0.0.1:${slackPort}/api`,
+      SLACK_SOCKET_OPEN_URL: "apps.connections.open",
+      SLACK_INITIAL_THREAD_HISTORY_COUNT: "1",
+      SLACK_HISTORY_API_MAX_LIMIT: "20",
+      STATE_DIR: stateDir,
+      SESSIONS_ROOT: sessionsRoot,
+      REPOS_ROOT: reposRoot,
+      CODEX_HOME: codexHome,
+      CODEX_AUTH_JSON_PATH: path.join(os.homedir(), ".codex", "auth.json"),
+      PORT: "3300",
+      DEBUG: "1"
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
 
   child.stdout.on("data", (chunk) => process.stdout.write(chunk));
   child.stderr.on("data", (chunk) => process.stderr.write(chunk));
