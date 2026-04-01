@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 import type { SlackUserIdentity } from "../../types.js";
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
-const templatePath = path.resolve(moduleDir, "prompts", "slack-thread-base-instructions.md");
 
 let templateCache: Promise<string> | undefined;
 
@@ -110,10 +109,27 @@ export async function buildSlackThreadBaseInstructions(
 
 async function loadTemplate(): Promise<string> {
   if (!templateCache) {
-    templateCache = fs.readFile(templatePath, "utf8");
+    templateCache = readFirstExistingFile([
+      path.resolve(moduleDir, "prompts", "slack-thread-base-instructions.md"),
+      path.resolve(moduleDir, "src", "services", "codex", "prompts", "slack-thread-base-instructions.md")
+    ]);
   }
 
   return await templateCache;
+}
+
+async function readFirstExistingFile(paths: readonly string[]): Promise<string> {
+  let lastError: unknown;
+
+  for (const candidate of paths) {
+    try {
+      return await fs.readFile(candidate, "utf8");
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Unable to locate prompt template.");
 }
 
 function renderTemplate(template: string, variables: Record<string, string>): string {

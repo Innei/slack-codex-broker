@@ -17,7 +17,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/build/copy-static-assets.mjs",
+    "build": "tsdown --config tsdown.config.ts && node scripts/build/copy-static-assets.mjs",
     "dev": "tsx watch src/index.ts",
     "dev:admin": "tsx watch src/admin-index.ts",
     "dev:worker": "tsx watch src/worker-index.ts",
@@ -43,6 +43,7 @@
   "devDependencies": {
     "@types/node": "^24.5.2",
     "@types/ws": "^8.18.1",
+    "tsdown": "^0.21.7",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
