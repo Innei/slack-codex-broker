@@ -17,6 +17,7 @@
     "node": ">=22"
   },
   "scripts": {
+    "preinstall": "npx only-allow pnpm",
     "build": "tsdown --config tsdown.config.ts && node scripts/build/copy-static-assets.mjs",
     "dev": "tsx watch src/index.ts",
     "dev:admin": "tsx watch src/admin-index.ts",

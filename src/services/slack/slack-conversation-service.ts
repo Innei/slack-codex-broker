@@ -356,6 +356,7 @@ export class SlackConversationService {
     readonly text: string;
     readonly kind?: SlackTurnSignalKind | undefined;
     readonly reason?: string | undefined;
+    readonly contextText?: string | undefined;
   }): Promise<void> {
     const chunks = chunkSlackMessage(options.text);
     for (const [index, chunk] of chunks.entries()) {
@@ -366,7 +367,9 @@ export class SlackConversationService {
                 kind: options.kind,
                 reason: options.reason
               }
-            : undefined
+            : undefined,
+        // Only add contextText to the last chunk
+        contextText: index === chunks.length - 1 ? options.contextText : undefined
       });
     }
 
@@ -765,9 +768,12 @@ export class SlackConversationService {
         readonly kind: SlackTurnSignalKind;
         readonly reason?: string | undefined;
       } | undefined;
+      readonly contextText?: string | undefined;
     }
   ): Promise<string | undefined> {
-    const ts = await this.#slackApi.postThreadMessage(channelId, rootThreadTs, text);
+    const ts = await this.#slackApi.postThreadMessage(channelId, rootThreadTs, text, {
+      contextText: options?.contextText
+    });
     if (ts) {
       this.#selfMessageFilter.rememberPostedMessageTs(ts);
       const occurredAt = new Date().toISOString();

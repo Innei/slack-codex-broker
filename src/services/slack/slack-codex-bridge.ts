@@ -19,6 +19,8 @@ import { SlackConversationService } from "./slack-conversation-service.js";
 import { SlackSelfMessageFilter } from "./slack-self-filter.js";
 import { SlackSocketModeClient } from "./socket-mode-client.js";
 
+const SLACK_DISCLAIMER_TEXT = "Claude can make mistakes. Please double-check responses.";
+
 export class SlackCodexBridge {
   readonly #config: AppConfig;
   readonly #sessions: SessionManager;
@@ -146,6 +148,7 @@ export class SlackCodexBridge {
     readonly text: string;
     readonly kind?: "progress" | "final" | "block" | "wait" | undefined;
     readonly reason?: string | undefined;
+    readonly contextText?: string | undefined;
   }): Promise<void> {
     await this.#conversations.postSlackMessage(options);
   }
@@ -279,7 +282,8 @@ export class SlackCodexBridge {
       await this.#conversations.postSlackMessage({
         channelId: parsed.channelId,
         rootThreadTs: parsed.rootThreadTs,
-        text: "I've joined this thread and I'm checking the context now. I'll be with you shortly."
+        text: "I've joined this thread and I'm checking the context now. I'll be with you shortly.",
+        contextText: SLACK_DISCLAIMER_TEXT
       });
     }
 
