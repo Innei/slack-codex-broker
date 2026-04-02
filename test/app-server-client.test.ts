@@ -238,6 +238,59 @@ describe("AppServerClient disconnect handling", () => {
     await client.close();
   });
 
+  it("emits command execution events from commandExecution items", async () => {
+    const server = await createServer((socket, message) => {
+      if (message.method === "initialize") {
+        socket.send(JSON.stringify({
+          id: message.id,
+          result: { ok: true }
+        }));
+        setTimeout(() => {
+          socket.send(JSON.stringify({
+            method: "item/started",
+            params: {
+              threadId: "thread-1",
+              turnId: "turn-1",
+              item: {
+                type: "commandExecution",
+                id: "cmd-1",
+                command: "bash -lc 'pwd'",
+                cwd: "/tmp/workspace",
+                status: "inProgress"
+              }
+            }
+          }));
+        }, 0);
+      }
+    });
+    servers.push(server);
+
+    const client = new AppServerClient({
+      url: server.url,
+      serviceName: "test",
+      brokerHttpBaseUrl: "http://127.0.0.1:3000",
+      reposRoot: "/tmp/repos"
+    });
+
+    const event = new Promise<Record<string, unknown>>((resolve) => {
+      client.once("command_execution", (payload: Record<string, unknown>) => resolve(payload));
+    });
+
+    await client.connect();
+    await expect(event).resolves.toEqual({
+      threadId: "thread-1",
+      turnId: "turn-1",
+      itemId: "cmd-1",
+      phase: "started",
+      command: "bash -lc 'pwd'",
+      cwd: "/tmp/workspace",
+      status: "inProgress",
+      durationMs: undefined,
+      exitCode: undefined
+    });
+    await client.close();
+  });
+
   it("can recover a completed turn result from thread/read", async () => {
     const server = await createServer((socket, message) => {
       if (message.method === "initialize") {

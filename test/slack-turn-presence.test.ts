@@ -103,6 +103,78 @@ describe("SlackTurnPresence", () => {
       markdownText: "\n- 已发送最终回复"
     }));
   });
+
+  it("surfaces command execution metadata in status and thinking stream", async () => {
+    const setAssistantThreadStatus = vi.fn(async () => {});
+    const startThreadStream = vi.fn(async () => "111.333");
+    const appendThreadStream = vi.fn(async () => {});
+    const stopThreadStream = vi.fn(async () => {});
+    const setLastSlackReplyAt = vi.fn(async (_channelId: string, _rootThreadTs: string) => session);
+
+    const presence = new SlackTurnPresence({
+      slackApi: {
+        setAssistantThreadStatus,
+        startThreadStream,
+        appendThreadStream,
+        stopThreadStream
+      },
+      sessions: {
+        setLastSlackReplyAt
+      }
+    });
+
+    await presence.beginTurn({
+      session,
+      turnId: "turn-1"
+    });
+
+    await presence.noteCommandExecution({
+      turnId: "turn-1",
+      itemId: "cmd-1",
+      phase: "started",
+      command: "bash -lc 'pwd'",
+      cwd: "/tmp/workspace"
+    });
+
+    expect(setAssistantThreadStatus).toHaveBeenLastCalledWith(expect.objectContaining({
+      status: "is thinking…",
+      loadingMessages: expect.arrayContaining(["Working in workspace", "Running Bash"])
+    }));
+    expect(startThreadStream).toHaveBeenCalledWith(expect.objectContaining({
+      markdownText: "思考过程：\n- Running Bash",
+      chunks: expect.arrayContaining([
+        expect.objectContaining({
+          type: "plan_update",
+          title: "Working in workspace"
+        }),
+        expect.objectContaining({
+          type: "task_update",
+          title: "执行命令",
+          details: "Running Bash"
+        })
+      ])
+    }));
+
+    await presence.noteCommandExecution({
+      turnId: "turn-1",
+      itemId: "cmd-1",
+      phase: "completed",
+      command: "bash -lc 'pwd'",
+      cwd: "/tmp/workspace",
+      durationMs: 3_000
+    });
+
+    expect(appendThreadStream).toHaveBeenCalledWith(expect.objectContaining({
+      markdownText: "\n- Finished Bash (3s)",
+      chunks: expect.arrayContaining([
+        expect.objectContaining({
+          type: "task_update",
+          title: "执行命令",
+          output: "Finished Bash (3s)"
+        })
+      ])
+    }));
+  });
 });
 
 const session: SlackSessionRecord = {

@@ -17,6 +17,23 @@ export interface AddedReaction {
   readonly name: string;
 }
 
+export interface AssistantThreadStatusUpdate {
+  readonly channelId: string;
+  readonly threadTs: string;
+  readonly status: string;
+  readonly loadingMessages?: readonly string[] | undefined;
+}
+
+export interface StreamRequest {
+  readonly kind: "start" | "append" | "stop";
+  readonly channel: string;
+  readonly threadTs?: string | undefined;
+  readonly ts: string;
+  readonly markdownText?: string | undefined;
+  readonly chunks?: readonly Record<string, unknown>[] | undefined;
+  readonly taskDisplayMode?: string | undefined;
+}
+
 export interface MockThreadMessage {
   readonly channel: string;
   readonly threadTs: string;
@@ -40,6 +57,8 @@ export class MockSlackServer {
   readonly postedMessages: PostedMessage[] = [];
   readonly reactionRequests: AddedReaction[] = [];
   readonly addedReactions: AddedReaction[] = [];
+  readonly assistantThreadStatuses: AssistantThreadStatusUpdate[] = [];
+  readonly streamRequests: StreamRequest[] = [];
   readonly #users = new Map<string, {
     readonly id: string;
     readonly name: string;
@@ -325,6 +344,43 @@ export class MockSlackServer {
       return;
     }
 
+    if (request.url === "/api/assistant.threads.setStatus") {
+      this.assistantThreadStatuses.push({
+        channelId: String(body.channel_id),
+        threadTs: String(body.thread_ts),
+        status: String(body.status ?? ""),
+        loadingMessages: readJsonStringArray(body.loading_messages)
+      });
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ ok: true }));
+      return;
+    }
+
+    if (
+      request.url === "/api/chat.startStream" ||
+      request.url === "/api/chat.appendStream" ||
+      request.url === "/api/chat.stopStream"
+    ) {
+      const kind = request.url.endsWith("startStream")
+        ? "start"
+        : request.url.endsWith("appendStream")
+          ? "append"
+          : "stop";
+      const ts = kind === "start" ? `${this.#nextTs++}.000000` : String(body.ts);
+      this.streamRequests.push({
+        kind,
+        channel: String(body.channel),
+        threadTs: typeof body.thread_ts === "string" ? body.thread_ts : undefined,
+        ts,
+        markdownText: typeof body.markdown_text === "string" ? body.markdown_text : undefined,
+        chunks: readJsonArray(body.chunks),
+        taskDisplayMode: typeof body.task_display_mode === "string" ? body.task_display_mode : undefined
+      });
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ ok: true, ts }));
+      return;
+    }
+
     response.writeHead(404).end();
   }
 
@@ -404,6 +460,25 @@ function readJsonArray(value: unknown): readonly Record<string, unknown>[] | und
   try {
     const parsed = JSON.parse(value) as unknown;
     return Array.isArray(parsed) ? (parsed as readonly Record<string, unknown>[]) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function readJsonStringArray(value: unknown): readonly string[] | undefined {
+  if (Array.isArray(value)) {
+    return value.filter((entry): entry is string => typeof entry === "string");
+  }
+
+  if (typeof value !== "string" || !value.trim()) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((entry): entry is string => typeof entry === "string")
+      : undefined;
   } catch {
     return undefined;
   }

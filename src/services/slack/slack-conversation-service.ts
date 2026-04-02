@@ -131,6 +131,17 @@ export class SlackConversationService {
     }) => {
       void this.#turnPresence.noteToolUse(payload.turnId, payload.toolName, payload.params);
     });
+    options.codex.on("command_execution", (payload: {
+      turnId: string;
+      itemId: string;
+      phase: "started" | "completed";
+      command: string;
+      cwd?: string | undefined;
+      durationMs?: number | null | undefined;
+      exitCode?: number | null | undefined;
+    }) => {
+      void this.#turnPresence.noteCommandExecution(payload);
+    });
   }
 
   setBotUserId(botUserId: string): void {

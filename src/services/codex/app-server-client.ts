@@ -50,6 +50,18 @@ interface BufferedTurnNotification {
   } | undefined;
 }
 
+export interface CommandExecutionEvent {
+  readonly threadId: string;
+  readonly turnId: string;
+  readonly itemId: string;
+  readonly phase: "started" | "completed";
+  readonly command: string;
+  readonly cwd?: string | undefined;
+  readonly status?: string | undefined;
+  readonly durationMs?: number | null | undefined;
+  readonly exitCode?: number | null | undefined;
+}
+
 export interface StartedTurn {
   readonly turnId: string;
   readonly completion: Promise<CodexTurnResult>;
@@ -583,6 +595,30 @@ export class AppServerClient extends EventEmitter {
   }
 
   #handleTurnEvent(method: string, params: Record<string, any>): void {
+    if (method === "item/started" || method === "item/completed") {
+      const item = params.item as Record<string, any> | undefined;
+
+      if (item?.type === "commandExecution") {
+        const threadId = params.threadId as string | undefined;
+        const turnId = params.turnId as string | undefined;
+        const itemId = item.id as string | undefined;
+
+        if (threadId && turnId && itemId) {
+          this.emit("command_execution", {
+            threadId,
+            turnId,
+            itemId,
+            phase: method === "item/started" ? "started" : "completed",
+            command: String(item.command ?? ""),
+            cwd: typeof item.cwd === "string" ? item.cwd : undefined,
+            status: typeof item.status === "string" ? item.status : undefined,
+            durationMs: typeof item.durationMs === "number" ? item.durationMs : undefined,
+            exitCode: typeof item.exitCode === "number" ? item.exitCode : undefined
+          } satisfies CommandExecutionEvent);
+        }
+      }
+    }
+
     if (method === "item/agentMessage/delta") {
       const turn = this.#activeTurns.get(params.turnId as string);
       if (turn) {

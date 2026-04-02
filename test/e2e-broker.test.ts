@@ -232,6 +232,88 @@ describe.sequential("slack-codex-broker e2e", () => {
     await waitForSessionIdle(tempRoot, "C123:113.220");
   }, 60_000);
 
+  it("surfaces command execution metadata through Slack status and stream APIs", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-broker-e2e-"));
+    cleanups.push(async () => {
+      await removeTempRoot(tempRoot);
+    });
+
+    const mockSlack = new MockSlackServer("UBOT", {
+      botId: "BBOT",
+      appId: "AAPP"
+    });
+    const mockCodex = new MockCodexAppServer({
+      onTurnStart: async (context) => {
+        context.notify("item/started", {
+          threadId: context.threadId,
+          turnId: context.turnId,
+          item: {
+            type: "commandExecution",
+            id: "cmd-1",
+            command: "bash -lc 'pwd'",
+            cwd: "/tmp/mock-repo",
+            status: "inProgress"
+          }
+        });
+        await delay(50);
+        context.notify("item/completed", {
+          threadId: context.threadId,
+          turnId: context.turnId,
+          item: {
+            type: "commandExecution",
+            id: "cmd-1",
+            command: "bash -lc 'pwd'",
+            cwd: "/tmp/mock-repo",
+            status: "completed",
+            durationMs: 2_000,
+            exitCode: 0
+          }
+        });
+        context.complete("done");
+      }
+    });
+    const slackPort = await mockSlack.start();
+    const codexUrl = await mockCodex.start();
+    cleanups.push(async () => {
+      await mockCodex.stop();
+      await mockSlack.stop();
+    });
+
+    const broker = await startBrokerProcess({
+      port: await getFreePort(),
+      slackPort,
+      codexUrl,
+      tempRoot
+    });
+    cleanups.push(() => broker.stop());
+
+    await mockSlack.sendEvent("evt-command-presence", {
+      type: "app_mention",
+      user: "U123",
+      channel: "C123",
+      thread_ts: "113.320",
+      ts: "113.321",
+      text: "<@UBOT> 跑一下命令"
+    });
+
+    await waitForSessionIdle(tempRoot, "C123:113.320");
+
+    await waitFor(() => mockSlack.assistantThreadStatuses.some((entry) =>
+      entry.loadingMessages?.includes("Working in mock-repo") &&
+      entry.loadingMessages?.includes("Running Bash")
+    ), "command execution loading message");
+
+    await waitFor(() => mockSlack.streamRequests.some((entry) =>
+      entry.kind === "start" &&
+      entry.chunks?.some((chunk) => chunk.type === "plan_update" && chunk.title === "Working in mock-repo") &&
+      entry.chunks?.some((chunk) => chunk.type === "task_update" && chunk.title === "执行命令" && chunk.details === "Running Bash")
+    ), "command execution stream start");
+
+    await waitFor(() => mockSlack.streamRequests.some((entry) =>
+      entry.chunks?.some((chunk) => chunk.type === "markdown_text" && chunk.text === "\n- Finished Bash (2s)")
+    ), "command execution stream append");
+  }, 60_000);
+
   it("adds acknowledgement reactions for inbound user messages", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-broker-e2e-"));
     cleanups.push(async () => {

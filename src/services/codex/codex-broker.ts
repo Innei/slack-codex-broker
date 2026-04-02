@@ -7,6 +7,7 @@ import type {
   AppServerAccountSummary,
   CodexInputItem,
   AppServerRateLimitsResponse,
+  CommandExecutionEvent,
   ReadTurnResultOptions,
   ReadTurnResult,
   StartedTurn
@@ -190,6 +191,13 @@ export class CodexBroker extends EventEmitter {
       }
 
       this.emit("turn_delta", payload);
+    });
+    client.on("command_execution", (payload: CommandExecutionEvent) => {
+      if (client !== this.#client) {
+        return;
+      }
+
+      this.emit("command_execution", payload);
     });
     client.on("notification", (method: string, params: Record<string, unknown>) => {
       if (client !== this.#client) {

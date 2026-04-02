@@ -1,3 +1,7 @@
+import { execFile } from "node:child_process";
+import path from "node:path";
+import { promisify } from "node:util";
+
 import { logger } from "../../logger.js";
 import type { SlackSessionRecord } from "../../types.js";
 import type {
@@ -14,6 +18,9 @@ const MAX_TIMELINE_STEPS = 6;
 const MAX_LOADING_MESSAGES = 4;
 const DEFAULT_STATUS = "is thinking…";
 const PLAN_TITLE = "Thinking steps";
+const MAX_COMMAND_LABEL_LENGTH = 48;
+
+const execFileAsync = promisify(execFile);
 
 type PresenceTaskStatus = SlackTaskUpdateChunk["status"];
 type PresenceEndKind = "completed" | "wait" | "block" | "failed" | "interrupted";
@@ -42,6 +49,10 @@ interface RuntimePresenceState {
   lastStatusFingerprint?: string | undefined;
   currentLoadingMessages?: readonly string[] | undefined;
   finalizing: boolean;
+  planTitle: string;
+  workingLabel?: string | undefined;
+  activeCommandLabel?: string | undefined;
+  activeCommandStepId?: string | undefined;
   readonly steps: PresenceTaskState[];
   nextStepSequence: number;
   activeStepId?: string | undefined;
@@ -145,6 +156,16 @@ export class SlackTurnPresence {
   readonly #sessions: PresenceSessionStore;
   readonly #runtimeBySessionKey = new Map<string, RuntimePresenceState>();
   readonly #sessionKeyByTurnId = new Map<string, string>();
+  readonly #workingLabelByCwd = new Map<string, Promise<string | undefined>>();
+  readonly #pendingCommandEventsByTurnId = new Map<string, Array<{
+    readonly turnId: string;
+    readonly itemId: string;
+    readonly phase: "started" | "completed";
+    readonly command: string;
+    readonly cwd?: string | undefined;
+    readonly durationMs?: number | null | undefined;
+    readonly exitCode?: number | null | undefined;
+  }>>();
 
   constructor(options: {
     readonly slackApi: PresenceSlackApi;
@@ -172,6 +193,7 @@ export class SlackTurnPresence {
       streamDisabled: false,
       statusActive: false,
       finalizing: false,
+      planTitle: PLAN_TITLE,
       steps: [],
       nextStepSequence: 0,
       fallbackPhaseIndex: 0,
@@ -191,6 +213,12 @@ export class SlackTurnPresence {
       announce: false,
       source: "fallback"
     });
+
+    const bufferedCommandEvents = this.#pendingCommandEventsByTurnId.get(options.turnId) ?? [];
+    this.#pendingCommandEventsByTurnId.delete(options.turnId);
+    for (const event of bufferedCommandEvents) {
+      await this.noteCommandExecution(event);
+    }
 
     runtime.streamStartTimer = setTimeout(() => {
       void this.#advanceFallbackPhase(runtime.sessionKey, { minimumIndex: 1, force: true });
@@ -242,6 +270,81 @@ export class SlackTurnPresence {
       loadingMessages: [toolDisplay, ...phaseInfo.loadingMessages],
       source: "delta",
       announce: false
+    });
+  }
+
+  async noteCommandExecution(options: {
+    readonly turnId: string;
+    readonly itemId: string;
+    readonly phase: "started" | "completed";
+    readonly command: string;
+    readonly cwd?: string | undefined;
+    readonly durationMs?: number | null | undefined;
+    readonly exitCode?: number | null | undefined;
+  }): Promise<void> {
+    const runtime = this.#getByTurnId(options.turnId);
+    if (!runtime) {
+      const pending = this.#pendingCommandEventsByTurnId.get(options.turnId) ?? [];
+      pending.push(options);
+      this.#pendingCommandEventsByTurnId.set(options.turnId, pending);
+      return;
+    }
+
+    if (runtime.finalizing) {
+      return;
+    }
+
+    runtime.lastActivityAt = Date.now();
+
+    const commandLabel = describeCommand(options.command);
+    const workingLabel = await this.#resolveWorkingLabel(options.cwd);
+    if (workingLabel) {
+      runtime.workingLabel = workingLabel;
+      runtime.planTitle = `Working in ${workingLabel}`;
+    }
+
+    if (options.phase === "started") {
+      runtime.activeCommandLabel = commandLabel;
+      await this.#activatePhase(runtime, {
+        title: "执行命令",
+        line: `Running ${commandLabel}`,
+        details: `Running ${commandLabel}`,
+        loadingMessages: normalizeLoadingMessages([
+          workingLabel ? `Working in ${workingLabel}` : undefined,
+          `Running ${commandLabel}`,
+          "正在等待命令结果",
+          "正在读取输出"
+        ]),
+        source: "delta"
+      });
+      runtime.activeCommandStepId = getActiveStep(runtime)?.id;
+      return;
+    }
+
+    runtime.activeCommandLabel = undefined;
+    const summary = summarizeCommandCompletion(commandLabel, options.durationMs, options.exitCode);
+    const active = getActiveStep(runtime);
+    if (active && active.id === runtime.activeCommandStepId && active.status === "in_progress") {
+      active.status = "complete";
+      active.output = summary;
+      active.details = workingLabel ? `Working in ${workingLabel}` : undefined;
+      runtime.activeCommandStepId = undefined;
+      await this.#refreshStatus(runtime, true);
+      await this.#appendTimeline(runtime, summary);
+      return;
+    }
+
+    runtime.activeCommandStepId = undefined;
+    await this.#activatePhase(runtime, {
+      title: "处理命令结果",
+      line: summary,
+      details: summary,
+      loadingMessages: normalizeLoadingMessages([
+        workingLabel ? `Working in ${workingLabel}` : undefined,
+        "正在处理命令结果",
+        "正在继续处理"
+      ]),
+      source: "delta"
     });
   }
 
@@ -758,6 +861,28 @@ export class SlackTurnPresence {
 
     await this.#setStatus(runtime, "");
   }
+
+  async #resolveWorkingLabel(cwd?: string | undefined): Promise<string | undefined> {
+    const normalized = cwd?.trim();
+    if (!normalized) {
+      return undefined;
+    }
+
+    let pending = this.#workingLabelByCwd.get(normalized);
+    if (!pending) {
+      pending = resolveWorkingLabelFromCwd(normalized)
+        .catch((error) => {
+          logger.warn("Failed to resolve working directory label", {
+            cwd: normalized,
+            error: error instanceof Error ? error.message : String(error)
+          });
+          return path.basename(normalized) || undefined;
+        });
+      this.#workingLabelByCwd.set(normalized, pending);
+    }
+
+    return await pending;
+  }
 }
 
 function buildFallbackPhaseUpdate(index: number): Omit<PhaseUpdate, "source"> {
@@ -827,7 +952,7 @@ function buildTimelineChunks(runtime: RuntimePresenceState): readonly SlackStrea
   return [
     {
       type: "plan_update",
-      title: PLAN_TITLE
+      title: runtime.planTitle
     },
     ...runtime.steps.map((step) => ({
       type: "task_update",
@@ -851,6 +976,8 @@ function buildLoadingMessages(runtime: RuntimePresenceState): readonly string[] 
     FALLBACK_PHASES[FALLBACK_PHASES.length - 1]!;
 
   return normalizeLoadingMessages([
+    runtime.workingLabel ? `Working in ${runtime.workingLabel}` : undefined,
+    runtime.activeCommandLabel ? `Running ${runtime.activeCommandLabel}` : undefined,
     activeStep ? toLoadingMessage(activeStep.title) : undefined,
     ...recentTitles,
     ...nextFallback.loadingMessages
@@ -993,6 +1120,102 @@ function truncateLogLine(value: string): string {
   }
 
   return `${trimmed.slice(0, MAX_LOG_LINE_LENGTH - 1)}…`;
+}
+
+function describeCommand(command: string): string {
+  const trimmed = command.trim();
+  if (!trimmed) {
+    return "Command";
+  }
+
+  const firstToken = splitCommandTokens(trimmed)[0] ?? trimmed;
+  const binary = path.basename(firstToken.replace(/^['"]|['"]$/g, ""));
+  const display = binary || trimmed;
+  return truncateDisplayLabel(toTitleCase(display));
+}
+
+function splitCommandTokens(command: string): string[] {
+  return command.match(/'[^']*'|"[^"]*"|\S+/g) ?? [];
+}
+
+function toTitleCase(value: string): string {
+  if (!value) {
+    return value;
+  }
+
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function truncateDisplayLabel(value: string): string {
+  if (value.length <= MAX_COMMAND_LABEL_LENGTH) {
+    return value;
+  }
+
+  return `${value.slice(0, MAX_COMMAND_LABEL_LENGTH - 1)}…`;
+}
+
+function summarizeCommandCompletion(
+  commandLabel: string,
+  durationMs?: number | null | undefined,
+  exitCode?: number | null | undefined
+): string {
+  const parts: string[] = [];
+  const durationLabel = formatDuration(durationMs);
+
+  if (durationLabel) {
+    parts.push(durationLabel);
+  }
+
+  if (typeof exitCode === "number" && exitCode !== 0) {
+    parts.push(`exit ${exitCode}`);
+  }
+
+  return parts.length > 0
+    ? `Finished ${commandLabel} (${parts.join(", ")})`
+    : `Finished ${commandLabel}`;
+}
+
+function formatDuration(durationMs?: number | null | undefined): string | undefined {
+  if (typeof durationMs !== "number" || !Number.isFinite(durationMs) || durationMs < 0) {
+    return undefined;
+  }
+
+  if (durationMs >= 1_000) {
+    const seconds = durationMs / 1_000;
+    return Number.isInteger(seconds) ? `${seconds}s` : `${seconds.toFixed(1)}s`;
+  }
+
+  return `${durationMs}ms`;
+}
+
+async function resolveWorkingLabelFromCwd(cwd: string): Promise<string | undefined> {
+  const normalized = cwd.trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  try {
+    const topLevel = (await execFileAsync("git", ["-C", normalized, "rev-parse", "--show-toplevel"]))
+      .stdout
+      .trim();
+    const remoteUrl = (await execFileAsync("git", ["-C", normalized, "config", "--get", "remote.origin.url"]))
+      .stdout
+      .trim();
+    const remoteLabel = parseRepoLabel(remoteUrl);
+    return remoteLabel || path.basename(topLevel) || path.basename(normalized);
+  } catch {
+    return path.basename(normalized) || undefined;
+  }
+}
+
+function parseRepoLabel(remoteUrl: string): string | undefined {
+  const trimmed = remoteUrl.trim().replace(/\.git$/i, "");
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const match = trimmed.match(/[:/]([^/:]+\/[^/]+)$/);
+  return match?.[1];
 }
 
 /**
