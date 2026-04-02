@@ -12,6 +12,7 @@ import type {
   StartedTurn
 } from "./app-server-client.js";
 import { logger } from "../../logger.js";
+import { getErrorMessage, isRecoverableCodexConnectionError } from "../../utils/error.js";
 import { getPersonalMemoryPath } from "./codex-home.js";
 
 export class CodexBroker extends EventEmitter {
@@ -204,7 +205,7 @@ export class CodexBroker extends EventEmitter {
         return;
       }
 
-      this.#handleClientDisconnect(error instanceof Error ? error : new Error(String(error)));
+      this.#handleClientDisconnect(new Error(getErrorMessage(error)));
     });
   }
 
@@ -222,7 +223,7 @@ export class CodexBroker extends EventEmitter {
         throw error;
       }
 
-      await this.#recoverClient(error instanceof Error ? error : new Error(String(error)));
+      await this.#recoverClient(new Error(getErrorMessage(error)));
       return await operation();
     }
   }
@@ -249,8 +250,7 @@ export class CodexBroker extends EventEmitter {
         } catch (reconnectError) {
           logger.warn("Reconnect to existing Codex app-server failed; restarting process", {
             reason: error.message,
-            reconnectError:
-              reconnectError instanceof Error ? reconnectError.message : String(reconnectError)
+            reconnectError: getErrorMessage(reconnectError)
           });
           await this.#queueConnectClient({
             restartProcess: true,
@@ -319,20 +319,8 @@ export class CodexBroker extends EventEmitter {
       await previousClient.close();
     } catch (error) {
       logger.warn("Failed to close previous Codex app-server client during reconnect", {
-        error: error instanceof Error ? error.message : String(error)
+        error: getErrorMessage(error)
       });
     }
   }
-}
-
-function isRecoverableCodexConnectionError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return [
-    "Codex app-server websocket is not connected",
-    "WebSocket is not open",
-    "readyState 3",
-    "socket hang up",
-    "ECONNREFUSED",
-    "closed"
-  ].some((pattern) => message.includes(pattern));
 }

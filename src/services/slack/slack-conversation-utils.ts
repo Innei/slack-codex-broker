@@ -5,6 +5,10 @@ import type {
   SlackSessionRecord,
   SlackTurnSignalKind
 } from "../../types.js";
+import {
+  getErrorMessage,
+  isRecoverableCodexConnectionError
+} from "../../utils/error.js";
 
 const AUTO_RECOVERY_SESSION_LOOKBACK_MS = 14 * 24 * 60 * 60 * 1_000;
 const DEFAULT_FAILURE_NOTIFICATION_COOLDOWN_MS = 5 * 60 * 1_000;
@@ -88,20 +92,11 @@ export function clampHistoryLimit(requested: number | undefined, fallback: numbe
 }
 
 export function isRecoverableCodexTurnFailure(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return [
-    "Codex app-server websocket is not connected",
-    "Codex app-server websocket closed",
-    "WebSocket is not open",
-    "readyState 3",
-    "socket hang up",
-    "ECONNREFUSED",
-    "closed"
-  ].some((pattern) => message.includes(pattern));
+  return isRecoverableCodexConnectionError(error);
 }
 
 export function isMissingCodexThreadError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = getErrorMessage(error);
   return (
     /no rollout found for thread id/i.test(message) ||
     /thread .* not found/i.test(message) ||
@@ -110,8 +105,7 @@ export function isMissingCodexThreadError(error: unknown): boolean {
 }
 
 export function createSlackFailureFingerprint(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.trim().replace(/\s+/g, " ");
+  return getErrorMessage(error).trim().replace(/\s+/g, " ");
 }
 
 export function shouldNotifySlackFailure(options: {
@@ -134,7 +128,7 @@ export function shouldNotifySlackFailure(options: {
 }
 
 export function formatSlackRunFailureMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = getErrorMessage(error);
 
   if (isRecoverableCodexTurnFailure(error)) {
     return "I lost my connection while working on this thread. I will resume as soon as the connection comes back.";
@@ -160,7 +154,7 @@ export function shouldPostSlackRunFailure(error: unknown): boolean {
 }
 
 export function isMissingActiveTurnSteerError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = getErrorMessage(error);
   return /no active turn to steer/i.test(message) || /expected active turn id `[^`]+` but found `[^`]+`/i.test(message);
 }
 
@@ -168,7 +162,7 @@ export function parseActiveTurnMismatch(error: unknown): {
   readonly expectedTurnId: string;
   readonly actualTurnId: string;
 } | null {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = getErrorMessage(error);
   const match = message.match(/expected active turn id `([^`]+)` but found `([^`]+)`/i);
   if (!match) {
     return null;
