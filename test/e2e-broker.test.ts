@@ -232,7 +232,7 @@ describe.sequential("slack-codex-broker e2e", () => {
     await waitForSessionIdle(tempRoot, "C123:113.220");
   }, 60_000);
 
-  it("surfaces command execution metadata through Slack status and stream APIs", async () => {
+  it("surfaces command execution metadata through Slack status only", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-broker-e2e-"));
     cleanups.push(async () => {
       await removeTempRoot(tempRoot);
@@ -303,15 +303,12 @@ describe.sequential("slack-codex-broker e2e", () => {
       entry.loadingMessages?.includes("Running Bash")
     ), "command execution loading message");
 
-    await waitFor(() => mockSlack.streamRequests.some((entry) =>
-      entry.kind === "start" &&
-      entry.chunks?.some((chunk) => chunk.type === "plan_update" && chunk.title === "Working in mock-repo") &&
-      entry.chunks?.some((chunk) => chunk.type === "task_update" && chunk.title === "执行命令" && chunk.details === "Running Bash")
-    ), "command execution stream start");
+    await waitFor(() => mockSlack.assistantThreadStatuses.some((entry) =>
+      entry.loadingMessages?.includes("Working in mock-repo") &&
+      entry.loadingMessages?.includes("Finished Bash (2s)")
+    ), "command execution completion loading message");
 
-    await waitFor(() => mockSlack.streamRequests.some((entry) =>
-      entry.chunks?.some((chunk) => chunk.type === "markdown_text" && chunk.text === "\n- Finished Bash (2s)")
-    ), "command execution stream append");
+    expect(mockSlack.streamRequests).toHaveLength(0);
   }, 60_000);
 
   it("adds acknowledgement reactions for inbound user messages", async () => {

@@ -9,21 +9,15 @@ afterEach(() => {
 });
 
 describe("SlackTurnPresence", () => {
-  it("updates dynamic status text, starts a thinking stream, and finalizes it", async () => {
+  it("keeps presence in assistant status/loading messages only and finalizes it", async () => {
     vi.useFakeTimers();
 
     const setAssistantThreadStatus = vi.fn(async () => {});
-    const startThreadStream = vi.fn(async () => "111.333");
-    const appendThreadStream = vi.fn(async () => {});
-    const stopThreadStream = vi.fn(async () => {});
     const setLastSlackReplyAt = vi.fn(async (_channelId: string, _rootThreadTs: string) => session);
 
     const presence = new SlackTurnPresence({
       slackApi: {
-        setAssistantThreadStatus,
-        startThreadStream,
-        appendThreadStream,
-        stopThreadStream
+        setAssistantThreadStatus
       },
       sessions: {
         setLastSlackReplyAt
@@ -44,45 +38,27 @@ describe("SlackTurnPresence", () => {
       loadingMessages: expect.arrayContaining(["正在理解请求"])
     }));
 
-    await vi.advanceTimersByTimeAsync(1_500);
-
-    expect(startThreadStream).toHaveBeenCalledTimes(1);
-    expect(startThreadStream).toHaveBeenCalledWith(expect.objectContaining({
-      channelId: "C123",
-      threadTs: "111.222",
-      recipientUserId: "U123",
-      recipientTeamId: "T123",
-      taskDisplayMode: "plan",
-      markdownText: "思考过程：\n- 已开始查看上下文",
-      chunks: expect.arrayContaining([
-        expect.objectContaining({
-          type: "task_update",
-          title: "理解请求",
-          status: "complete"
-        }),
-        expect.objectContaining({
-          type: "task_update",
-          title: "查看上下文",
-          status: "in_progress"
-        })
-      ])
-    }));
-
     await presence.noteTurnDelta("turn-1");
 
-    expect(appendThreadStream).toHaveBeenCalledTimes(1);
-    expect(appendThreadStream).toHaveBeenCalledWith(expect.objectContaining({
+    expect(setAssistantThreadStatus).toHaveBeenNthCalledWith(2, {
       channelId: "C123",
-      streamTs: "111.333",
-      markdownText: "\n- 已开始组织回复",
-      chunks: expect.arrayContaining([
-        expect.objectContaining({
-          type: "task_update",
-          title: "整理回复",
-          status: "in_progress"
-        })
-      ])
-    }));
+      threadTs: "111.222",
+      status: "is thinking…",
+      loadingMessages: ["正在整理回复", "正在压缩关键信息", "已开始组织回复"]
+    });
+
+    await presence.noteSlackMessage({
+      session,
+      kind: "progress",
+      text: "我在拉最新分支复查，先跑一轮测试和看修复点。"
+    });
+
+    expect(setAssistantThreadStatus).toHaveBeenNthCalledWith(3, {
+      channelId: "C123",
+      threadTs: "111.222",
+      status: "is thinking…",
+      loadingMessages: ["我在拉最新分支复查，先跑一轮测试和看修复点。", "正在运行测试", "正在等待测试结果", "正在核对输出"]
+    });
 
     await presence.noteSlackMessage({
       session,
@@ -96,27 +72,15 @@ describe("SlackTurnPresence", () => {
       status: "",
       loadingMessages: undefined
     });
-    expect(stopThreadStream).toHaveBeenCalledTimes(1);
-    expect(stopThreadStream).toHaveBeenCalledWith(expect.objectContaining({
-      channelId: "C123",
-      streamTs: "111.333",
-      markdownText: "\n- 已发送最终回复"
-    }));
   });
 
-  it("surfaces command execution metadata in status and thinking stream", async () => {
+  it("surfaces command execution metadata in status only", async () => {
     const setAssistantThreadStatus = vi.fn(async () => {});
-    const startThreadStream = vi.fn(async () => "111.333");
-    const appendThreadStream = vi.fn(async () => {});
-    const stopThreadStream = vi.fn(async () => {});
     const setLastSlackReplyAt = vi.fn(async (_channelId: string, _rootThreadTs: string) => session);
 
     const presence = new SlackTurnPresence({
       slackApi: {
-        setAssistantThreadStatus,
-        startThreadStream,
-        appendThreadStream,
-        stopThreadStream
+        setAssistantThreadStatus
       },
       sessions: {
         setLastSlackReplyAt
@@ -138,21 +102,7 @@ describe("SlackTurnPresence", () => {
 
     expect(setAssistantThreadStatus).toHaveBeenLastCalledWith(expect.objectContaining({
       status: "is thinking…",
-      loadingMessages: expect.arrayContaining(["Working in workspace", "Running Bash"])
-    }));
-    expect(startThreadStream).toHaveBeenCalledWith(expect.objectContaining({
-      markdownText: "思考过程：\n- Running Bash",
-      chunks: expect.arrayContaining([
-        expect.objectContaining({
-          type: "plan_update",
-          title: "Working in workspace"
-        }),
-        expect.objectContaining({
-          type: "task_update",
-          title: "执行命令",
-          details: "Running Bash"
-        })
-      ])
+      loadingMessages: ["Working in workspace", "Running Bash", "正在等待命令结果", "正在读取输出"]
     }));
 
     await presence.noteCommandExecution({
@@ -164,15 +114,9 @@ describe("SlackTurnPresence", () => {
       durationMs: 3_000
     });
 
-    expect(appendThreadStream).toHaveBeenCalledWith(expect.objectContaining({
-      markdownText: "\n- Finished Bash (3s)",
-      chunks: expect.arrayContaining([
-        expect.objectContaining({
-          type: "task_update",
-          title: "执行命令",
-          output: "Finished Bash (3s)"
-        })
-      ])
+    expect(setAssistantThreadStatus).toHaveBeenLastCalledWith(expect.objectContaining({
+      status: "is thinking…",
+      loadingMessages: ["Working in workspace", "Finished Bash (3s)", "正在处理命令结果", "正在继续处理"]
     }));
   });
 });
