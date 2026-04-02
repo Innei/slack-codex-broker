@@ -29,6 +29,7 @@ export interface MockTurnContext {
   readonly cwd: string;
   readonly input: readonly CodexInputItem[];
   readonly thread: MockThreadRecord;
+  notify: (method: string, params?: unknown) => void;
   complete: (message?: string) => void;
   interrupt: (message?: string) => void;
 }
@@ -293,6 +294,12 @@ export class MockCodexAppServer {
       cwd: turn.cwd,
       input: turn.input,
       thread,
+      notify: (method: string, params?: unknown) => {
+        socket.send(JSON.stringify({
+          method,
+          params
+        }));
+      },
       complete: (message = "") => {
         if (turn.status !== "inProgress") {
           return;

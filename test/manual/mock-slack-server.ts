@@ -8,6 +8,7 @@ export interface PostedMessage {
   readonly threadTs: string;
   readonly text: string;
   readonly ts: string;
+  readonly blocks?: readonly Record<string, unknown>[] | undefined;
 }
 
 export interface MockThreadMessage {
@@ -222,7 +223,8 @@ export class MockSlackServer {
         channel: String(body.channel),
         threadTs: String(body.thread_ts),
         text: String(body.text),
-        ts
+        ts,
+        blocks: readJsonArray(body.blocks)
       });
       this.recordThreadMessage({
         channel: String(body.channel),
@@ -336,4 +338,21 @@ async function readRequestBody(request: http.IncomingMessage): Promise<Record<st
 
 function getThreadKey(channel: string, threadTs: string): string {
   return `${channel}:${threadTs}`;
+}
+
+function readJsonArray(value: unknown): readonly Record<string, unknown>[] | undefined {
+  if (Array.isArray(value)) {
+    return value as readonly Record<string, unknown>[];
+  }
+
+  if (typeof value !== "string" || !value.trim()) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? (parsed as readonly Record<string, unknown>[]) : undefined;
+  } catch {
+    return undefined;
+  }
 }

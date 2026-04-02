@@ -196,9 +196,11 @@ export class CodexBroker extends EventEmitter {
         return;
       }
 
+      const notificationParams = normalizeNotificationParams(params);
+
       // Debug: log tool-related events to identify the correct event names
       if (method.includes("tool") || method.includes("Tool")) {
-        logger.debug("Codex tool notification", { method, paramKeys: Object.keys(params) });
+        logger.debug("Codex tool notification", { method, paramKeys: Object.keys(notificationParams) });
       }
 
       // Emit tool use events for presence updates
@@ -213,9 +215,18 @@ export class CodexBroker extends EventEmitter {
 
       if (isToolEvent) {
         // Try different param structures the server might use
-        const toolName = (params.toolName ?? params.tool_name ?? params.name ?? params.tool) as string | undefined;
-        const turnId = (params.turnId ?? params.turn_id) as string | undefined;
-        const toolParams = (params.params ?? params.arguments ?? params.input) as Record<string, unknown> | undefined;
+        const toolName = (
+          notificationParams.toolName ??
+          notificationParams.tool_name ??
+          notificationParams.name ??
+          notificationParams.tool
+        ) as string | undefined;
+        const turnId = (notificationParams.turnId ?? notificationParams.turn_id) as string | undefined;
+        const toolParams = (
+          notificationParams.params ??
+          notificationParams.arguments ??
+          notificationParams.input
+        ) as Record<string, unknown> | undefined;
 
         if (toolName && turnId) {
           this.emit("tool_use", {
@@ -358,4 +369,12 @@ export class CodexBroker extends EventEmitter {
       });
     }
   }
+}
+
+function normalizeNotificationParams(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, unknown>;
 }

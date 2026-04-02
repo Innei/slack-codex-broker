@@ -7,24 +7,44 @@ import type { AppServerRateLimitSnapshot } from "../codex/app-server-client.js";
  */
 
 /**
- * Extract repo name from workspace path.
- * e.g., "/repos/innei/slack-codex-broker" -> "innei/slack-codex-broker"
+ * Extract a human-meaningful repo name from a workspace path when possible.
+ * Returns undefined for generic broker session workspaces like ".../sessions/<id>/workspace".
  */
-export function extractRepoName(workspacePath: string): string {
-  const parts = workspacePath.split("/").filter(Boolean);
-  // Try to get last two parts as owner/repo
-  if (parts.length >= 2) {
-    return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
+export function extractRepoName(workspacePath: string): string | undefined {
+  const parts = workspacePath.split(/[\\/]+/).filter(Boolean);
+  if (parts.length === 0) {
+    return undefined;
   }
-  return parts[parts.length - 1] ?? workspacePath;
+
+  const basename = parts[parts.length - 1];
+  if (!basename) {
+    return undefined;
+  }
+
+  if (basename === "workspace" && parts.includes("sessions")) {
+    return undefined;
+  }
+
+  const reposIndex = parts.lastIndexOf("repos");
+  if (reposIndex >= 0) {
+    const repoParts = parts.slice(reposIndex + 1);
+    if (repoParts.length >= 2) {
+      return repoParts.slice(-2).join("/");
+    }
+    if (repoParts.length === 1) {
+      return repoParts[0];
+    }
+  }
+
+  return basename;
 }
 
 /**
  * Build context text for session/workspace info.
  */
-export function buildWorkspaceContext(session: SlackSessionRecord): string {
+export function buildWorkspaceContext(session: SlackSessionRecord): string | undefined {
   const repoName = extractRepoName(session.workspacePath);
-  return `📁 ${repoName}`;
+  return repoName ? `📁 ${repoName}` : undefined;
 }
 
 /**

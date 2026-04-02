@@ -14,7 +14,7 @@ interface TestServer {
 }
 
 async function createServer(
-  onMessage: (socket: WebSocket, message: { id?: string; method?: string; params?: Record<string, unknown> }) => void
+  onMessage: (socket: WebSocket, message: { id?: string; method?: string; params?: unknown }) => void
 ): Promise<TestServer> {
   const server = http.createServer();
   const wsServer = new WebSocketServer({ server });
@@ -26,7 +26,7 @@ async function createServer(
       connections.delete(socket);
     });
     socket.on("message", (data) => {
-      onMessage(socket, JSON.parse(data.toString()) as { id?: string; method?: string; params?: Record<string, unknown> });
+      onMessage(socket, JSON.parse(data.toString()) as { id?: string; method?: string; params?: unknown });
     });
   });
 
@@ -197,6 +197,45 @@ describe("AppServerClient disconnect handling", () => {
       finalMessage: "",
       aborted: false
     });
+  });
+
+  it("normalizes notification params to an object when the server sends null", async () => {
+    const server = await createServer((socket, message) => {
+      if (message.method === "initialize") {
+        socket.send(JSON.stringify({
+          id: message.id,
+          result: { ok: true }
+        }));
+        socket.send(JSON.stringify({
+          method: "tool/start",
+          params: null
+        }));
+      }
+    });
+    servers.push(server);
+
+    const client = new AppServerClient({
+      url: server.url,
+      serviceName: "test",
+      brokerHttpBaseUrl: "http://127.0.0.1:3000",
+      reposRoot: "/tmp/repos"
+    });
+
+    const notification = new Promise<{
+      method: string;
+      params: Record<string, unknown>;
+    }>((resolve) => {
+      client.once("notification", (method: string, params: Record<string, unknown>) => {
+        resolve({ method, params });
+      });
+    });
+
+    await client.connect();
+    await expect(notification).resolves.toEqual({
+      method: "tool/start",
+      params: {}
+    });
+    await client.close();
   });
 
   it("can recover a completed turn result from thread/read", async () => {
