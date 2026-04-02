@@ -115,7 +115,7 @@ describe("executeSlashCommand", () => {
         rateLimits: {
           limitId: "test",
           limitName: "Test Limit",
-          primary: { usedPercent: 0.5, windowDurationMins: 60, resetsAt: Date.now() / 1000 + 3600 },
+          primary: { usedPercent: 42, windowDurationMins: 60, resetsAt: Date.now() / 1000 + 3600 },
           secondary: null,
           credits: null,
           planType: "pro"
@@ -256,6 +256,17 @@ describe("executeSlashCommand", () => {
     expect(result.text).toContain("2 total");
     expect(result.text).toContain("[ACTIVE]");
     expect(result.text).toContain("<-- current");
+  });
+
+  it("displays correct percentage for /usage (usedPercent is already 0-100)", async () => {
+    const context = createMockContext();
+    const result = await executeSlashCommand({ command: "usage", args: "" }, context);
+
+    expect(result.handled).toBe(true);
+    // usedPercent=42 means 42% used, 58% remaining — not 4200%
+    expect(result.text).toContain("58% remaining");
+    expect(result.text).not.toContain("4200%");
+    expect(result.text).not.toMatch(/-\d+% remaining/);
   });
 
   it("handles usage command errors gracefully", async () => {

@@ -174,7 +174,7 @@ function formatRateLimitSnapshot(name: string, snapshot: AppServerRateLimitSnaps
   }
 
   if (snapshot.primary) {
-    const usedPercent = Math.round(snapshot.primary.usedPercent * 100);
+    const usedPercent = Math.round(snapshot.primary.usedPercent);
     const remaining = 100 - usedPercent;
     const progressBar = createProgressBar(usedPercent);
     lines.push(`  Primary: ${progressBar} ${remaining}% remaining`);
@@ -189,7 +189,7 @@ function formatRateLimitSnapshot(name: string, snapshot: AppServerRateLimitSnaps
   }
 
   if (snapshot.secondary) {
-    const usedPercent = Math.round(snapshot.secondary.usedPercent * 100);
+    const usedPercent = Math.round(snapshot.secondary.usedPercent);
     const remaining = 100 - usedPercent;
     const progressBar = createProgressBar(usedPercent);
     lines.push(`  Secondary: ${progressBar} ${remaining}% remaining`);

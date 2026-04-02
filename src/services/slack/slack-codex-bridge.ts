@@ -210,23 +210,21 @@ export class SlackCodexBridge {
       return;
     }
 
-    // Check for slash commands (only when no images attached)
-    if ((parsed.input.images?.length ?? 0) === 0) {
-      const slashCommand = parseSlashCommand(parsed.controlText);
-      if (slashCommand) {
-        await this.#handleSlashCommand(parsed, slashCommand);
-        return;
-      }
-    }
-
     switch (parsed.route) {
-      case "app_mention":
+      case "app_mention": {
+        // Slash commands on @mention require an existing session
+        const existing = this.#sessions.getSession(parsed.channelId, parsed.rootThreadTs);
+        if (existing && await this.#trySlashCommand(parsed, existing)) {
+          return;
+        }
+
         await this.#handleInteractiveSessionEvent(parsed, {
           createSession: true,
           preloadHistory: parsed.rootThreadTs !== parsed.messageTs
         });
         return;
-      case "direct_message":
+      }
+      case "direct_message": {
         if (parsed.controlText === "-stop" && (parsed.input.images?.length ?? 0) === 0) {
           const existing = this.#sessions.getSession(parsed.channelId, parsed.rootThreadTs);
           if (existing) {
@@ -235,11 +233,18 @@ export class SlackCodexBridge {
           return;
         }
 
+        // Slash commands in DMs require an existing session
+        const existing = this.#sessions.getSession(parsed.channelId, parsed.rootThreadTs);
+        if (existing && await this.#trySlashCommand(parsed, existing)) {
+          return;
+        }
+
         await this.#handleInteractiveSessionEvent(parsed, {
           createSession: true,
           preloadHistory: false
         });
         return;
+      }
       case "thread_reply": {
         const session = this.#sessions.getSession(parsed.channelId, parsed.rootThreadTs);
         if (!session) {
@@ -255,6 +260,10 @@ export class SlackCodexBridge {
           return;
         }
 
+        if (await this.#trySlashCommand(parsed, session)) {
+          return;
+        }
+
         if (isSlackMessageEffectivelyEmpty(parsed.input.text, parsed.input.images, parsed.input.slackMessage)) {
           return;
         }
@@ -265,6 +274,24 @@ export class SlackCodexBridge {
       default:
         return;
     }
+  }
+
+  /**
+   * Attempt to handle a slash command. Returns true if a command was matched and handled.
+   * Only triggers when images are not attached and the session already exists.
+   */
+  async #trySlashCommand(parsed: ParsedSlackEvent, session: SlackSessionRecord): Promise<boolean> {
+    if ((parsed.input.images?.length ?? 0) > 0) {
+      return false;
+    }
+
+    const slashCommand = parseSlashCommand(parsed.controlText);
+    if (!slashCommand) {
+      return false;
+    }
+
+    await this.#handleSlashCommand(parsed, slashCommand, session);
+    return true;
   }
 
   async #handleInteractiveSessionEvent(
@@ -329,11 +356,9 @@ export class SlackCodexBridge {
 
   async #handleSlashCommand(
     parsed: ParsedSlackEvent,
-    slashCommand: ParsedSlashCommand
+    slashCommand: ParsedSlashCommand,
+    session: SlackSessionRecord
   ): Promise<void> {
-
-    const session = this.#sessions.getSession(parsed.channelId, parsed.rootThreadTs);
-
     logger.info("Handling slash command", {
       command: slashCommand.command,
       args: slashCommand.args,
