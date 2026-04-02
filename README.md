@@ -148,6 +148,53 @@ pnpm ops:ui:real
 `ops:ui:real` starts a local-only admin page on `127.0.0.1` so you can inspect sessions/account state and upload a replacement `auth.json` without using CLI flags directly.
 `ops:resume:real` manually re-queues a stuck Slack session that still has pending inbound backlog but no active Codex turn. Use it as an operator fallback while debugging a broken thread.
 
+## Run With PM2 On The Host
+
+Use this mode when you want the broker and the child `codex app-server` to run directly on the host instead of inside Docker.
+That is the simplest path if you want Codex to keep host-level access to local files, shell commands, and any host-native computer-use capability exposed by the local Codex runtime.
+
+### Why host mode matters
+
+- `src/services/codex/app-server-process.ts` starts `codex app-server` as a local child process.
+- `src/services/codex/app-server-client.ts` starts threads/turns with `danger-full-access`.
+- If the broker itself runs on the host, the spawned Codex runtime also runs on the host.
+- If the broker runs in Docker, the spawned Codex runtime is isolated in that container too.
+
+### Quick start
+
+```bash
+cp .env.example .env
+pnpm install
+pnpm build
+pnpm pm2:start
+pm2 save
+```
+
+The included `ecosystem.config.cjs`:
+
+- reads `.env` when present
+- keeps your current shell environment (for `PATH`, `DISPLAY`, `WAYLAND_DISPLAY`, etc.)
+- defaults `DATA_ROOT` to `<repo>/.data`
+- starts the compiled broker entrypoint at `dist/src/index.js`
+
+Useful commands:
+
+```bash
+pnpm pm2:start
+pnpm pm2:restart
+pnpm pm2:stop
+pnpm pm2:logs
+```
+
+### Important notes
+
+- Leave `CODEX_APP_SERVER_URL` unset in host mode unless you intentionally manage a separate external Codex app-server yourself.
+- You do **not** need a second PM2 process for `codex app-server`; the broker manages that child process itself.
+- If you use `CODEX_AUTH_JSON_PATH`, point it at a host path. A common alternative is to place the auth file at `.data/codex-home/auth.json`.
+- For GUI-level automation on the host:
+  - macOS: run PM2 as the logged-in desktop user and grant Terminal/Node/Codex the needed Screen Recording / Accessibility permissions.
+  - Linux: make sure the PM2 environment includes the active desktop session variables such as `DISPLAY`, `WAYLAND_DISPLAY`, and `XDG_RUNTIME_DIR` when required by your local automation stack.
+
 ## Run On a macOS VM
 
 The preferred macOS deployment model is now GitHub-first:
