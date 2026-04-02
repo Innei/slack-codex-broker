@@ -334,8 +334,9 @@ export class SlackTurnPresence {
     try {
       await this.#clearStatus(runtime);
 
-      // Stop the response stream first
-      if (runtime.responseStreamTs && !runtime.responseStreamDisabled) {
+      // Stop the response stream first (always attempt if stream was started,
+      // even when responseStreamDisabled, to avoid leaving the Slack message in streaming state)
+      if (runtime.responseStreamTs) {
         await this.#safeStopResponseStream(runtime);
       }
 
@@ -571,7 +572,10 @@ export class SlackTurnPresence {
       return;
     }
 
-    runtime.responseStreamText = fullText;
+    // Only accept if fullText is longer to prevent stale deltas from regressing the buffer
+    if (fullText.length > runtime.responseStreamText.length) {
+      runtime.responseStreamText = fullText;
+    }
     runtime.lastActivityAt = Date.now();
 
     // Debounce the flush to avoid too many API calls
