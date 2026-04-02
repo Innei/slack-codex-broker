@@ -41,6 +41,10 @@ import {
   shouldNotifySlackFailure,
   shouldAutoRecoverSession
 } from "./slack-conversation-utils.js";
+import {
+  buildErrorContext,
+  buildWorkspaceContext
+} from "./slack-context-builder.js";
 import { SlackInboundStore } from "./slack-inbound-store.js";
 import {
   formatSlackHistoryContextForCodex
@@ -119,6 +123,13 @@ export class SlackConversationService {
     });
     options.codex.on("turn_delta", (payload: { turnId: string }) => {
       void this.#turnPresence.noteTurnDelta(payload.turnId);
+    });
+    options.codex.on("tool_use", (payload: {
+      turnId: string;
+      toolName: string;
+      params?: Record<string, unknown>;
+    }) => {
+      void this.#turnPresence.noteToolUse(payload.turnId, payload.toolName, payload.params);
     });
   }
 
@@ -356,6 +367,7 @@ export class SlackConversationService {
     readonly text: string;
     readonly kind?: SlackTurnSignalKind | undefined;
     readonly reason?: string | undefined;
+    readonly contextText?: string | undefined;
   }): Promise<void> {
     const chunks = chunkSlackMessage(options.text);
     for (const [index, chunk] of chunks.entries()) {
@@ -366,7 +378,9 @@ export class SlackConversationService {
                 kind: options.kind,
                 reason: options.reason
               }
-            : undefined
+            : undefined,
+        // Only add contextText to the last chunk
+        contextText: index === chunks.length - 1 ? options.contextText : undefined
       });
     }
 
@@ -765,9 +779,12 @@ export class SlackConversationService {
         readonly kind: SlackTurnSignalKind;
         readonly reason?: string | undefined;
       } | undefined;
+      readonly contextText?: string | undefined;
     }
   ): Promise<string | undefined> {
-    const ts = await this.#slackApi.postThreadMessage(channelId, rootThreadTs, text);
+    const ts = await this.#slackApi.postThreadMessage(channelId, rootThreadTs, text, {
+      contextText: options?.contextText
+    });
     if (ts) {
       this.#selfMessageFilter.rememberPostedMessageTs(ts);
       const occurredAt = new Date().toISOString();
@@ -1170,10 +1187,14 @@ export class SlackConversationService {
           nowMs
         })) {
           if (shouldPostSlackRunFailure(error)) {
+            const errorContext = session.activeTurnId
+              ? buildErrorContext({ sessionKey: session.key, turnId: session.activeTurnId })
+              : buildErrorContext({ sessionKey: session.key });
             await this.#postBotThreadMessage(
               session.channelId,
               session.rootThreadTs,
-              formatSlackRunFailureMessage(error)
+              formatSlackRunFailureMessage(error),
+              { contextText: errorContext }
             );
             runtime.lastFailureNotificationFingerprint = createSlackFailureFingerprint(error);
             runtime.lastFailureNotificationAtMs = nowMs;

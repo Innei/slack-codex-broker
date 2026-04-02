@@ -129,6 +129,218 @@ describe.sequential("slack-codex-broker e2e", () => {
     expect(botCardText).toContain("https://linear.app/cue/issue/CUE-1180");
   }, 90_000);
 
+  it("omits misleading repo context blocks for generic session workspaces", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-broker-e2e-"));
+    cleanups.push(async () => {
+      await removeTempRoot(tempRoot);
+    });
+
+    const mockSlack = new MockSlackServer("UBOT", {
+      botId: "BBOT",
+      appId: "AAPP"
+    });
+    const mockCodex = new MockCodexAppServer();
+    const slackPort = await mockSlack.start();
+    const codexUrl = await mockCodex.start();
+    cleanups.push(async () => {
+      await mockCodex.stop();
+      await mockSlack.stop();
+    });
+
+    const broker = await startBrokerProcess({
+      port: await getFreePort(),
+      slackPort,
+      codexUrl,
+      tempRoot
+    });
+    cleanups.push(() => broker.stop());
+
+    await mockSlack.sendEvent("evt-workspace-context", {
+      type: "app_mention",
+      user: "U123",
+      channel: "C123",
+      thread_ts: "112.220",
+      ts: "112.221",
+      text: "<@UBOT> 开个 session"
+    });
+
+    const joinMessage = await mockSlack.waitForPostedMessage((message) =>
+      message.text.includes("I've joined this thread and I'm checking the context now.")
+    );
+    expect(joinMessage.blocks).toBeUndefined();
+    await waitForSessionIdle(tempRoot, "C123:112.220");
+  }, 60_000);
+
+  it("ignores tool notifications with null params and keeps the session usable", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-broker-e2e-"));
+    cleanups.push(async () => {
+      await removeTempRoot(tempRoot);
+    });
+
+    const mockSlack = new MockSlackServer("UBOT", {
+      botId: "BBOT",
+      appId: "AAPP"
+    });
+    const mockCodex = new MockCodexAppServer({
+      onTurnStart: async (context) => {
+        context.notify("tool/start", null);
+        await delay(50);
+        context.complete("");
+      }
+    });
+    const slackPort = await mockSlack.start();
+    const codexUrl = await mockCodex.start();
+    cleanups.push(async () => {
+      await mockCodex.stop();
+      await mockSlack.stop();
+    });
+
+    const broker = await startBrokerProcess({
+      port: await getFreePort(),
+      slackPort,
+      codexUrl,
+      tempRoot
+    });
+    cleanups.push(() => broker.stop());
+
+    await mockSlack.sendEvent("evt-null-tool-params", {
+      type: "app_mention",
+      user: "U123",
+      channel: "C123",
+      thread_ts: "113.220",
+      ts: "113.221",
+      text: "<@UBOT> 跑一下"
+    });
+
+    await waitForSessionIdle(tempRoot, "C123:113.220");
+    const turnCountAfterFirstRun = mockCodex.turnsStarted.length;
+    expect(turnCountAfterFirstRun).toBeGreaterThanOrEqual(1);
+
+    await mockSlack.sendEvent("evt-after-null-tool-params", {
+      type: "message",
+      user: "U123",
+      channel: "C123",
+      thread_ts: "113.220",
+      ts: "113.222",
+      text: "继续"
+    });
+
+    await waitFor(
+      () => mockCodex.turnsStarted.length > turnCountAfterFirstRun,
+      "follow-up turn after null tool params"
+    );
+    await waitForSessionIdle(tempRoot, "C123:113.220");
+  }, 60_000);
+
+  it("adds acknowledgement reactions for inbound user messages", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-broker-e2e-"));
+    cleanups.push(async () => {
+      await removeTempRoot(tempRoot);
+    });
+
+    const mockSlack = new MockSlackServer("UBOT", {
+      botId: "BBOT",
+      appId: "AAPP"
+    });
+    const mockCodex = new MockCodexAppServer();
+    const slackPort = await mockSlack.start();
+    const codexUrl = await mockCodex.start();
+    cleanups.push(async () => {
+      await mockCodex.stop();
+      await mockSlack.stop();
+    });
+
+    const broker = await startBrokerProcess({
+      port: await getFreePort(),
+      slackPort,
+      codexUrl,
+      tempRoot
+    });
+    cleanups.push(() => broker.stop());
+
+    await mockSlack.sendEvent("evt-reaction-session", {
+      type: "app_mention",
+      user: "U123",
+      channel: "C123",
+      thread_ts: "114.220",
+      ts: "114.221",
+      text: "<@UBOT> 开个 session"
+    });
+    await mockSlack.waitForReaction((reaction) =>
+      reaction.channel === "C123" &&
+      reaction.messageTs === "114.221" &&
+      reaction.name === "eyes"
+    );
+    await waitForSessionIdle(tempRoot, "C123:114.220");
+
+    await mockSlack.sendEvent("evt-reaction-reply", {
+      type: "message",
+      user: "U123",
+      channel: "C123",
+      thread_ts: "114.220",
+      ts: "114.222",
+      text: "继续"
+    });
+    await mockSlack.waitForReaction((reaction) =>
+      reaction.channel === "C123" &&
+      reaction.messageTs === "114.222" &&
+      reaction.name === "eyes"
+    );
+    await waitForSessionIdle(tempRoot, "C123:114.220");
+  }, 60_000);
+
+  it("stops retrying acknowledgement reactions after a missing_scope error", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-broker-e2e-"));
+    cleanups.push(async () => {
+      await removeTempRoot(tempRoot);
+    });
+
+    const mockSlack = new MockSlackServer("UBOT", {
+      botId: "BBOT",
+      appId: "AAPP",
+      reactionError: "missing_scope"
+    });
+    const mockCodex = new MockCodexAppServer();
+    const slackPort = await mockSlack.start();
+    const codexUrl = await mockCodex.start();
+    cleanups.push(async () => {
+      await mockCodex.stop();
+      await mockSlack.stop();
+    });
+
+    const broker = await startBrokerProcess({
+      port: await getFreePort(),
+      slackPort,
+      codexUrl,
+      tempRoot
+    });
+    cleanups.push(() => broker.stop());
+
+    await mockSlack.sendEvent("evt-reaction-missing-scope-session", {
+      type: "app_mention",
+      user: "U123",
+      channel: "C123",
+      thread_ts: "115.220",
+      ts: "115.221",
+      text: "<@UBOT> 开个 session"
+    });
+    await waitFor(() => mockSlack.reactionRequests.length >= 1, "first reaction attempt");
+    await waitForSessionIdle(tempRoot, "C123:115.220");
+    expect(mockSlack.reactionRequests).toHaveLength(1);
+    expect(mockSlack.addedReactions).toHaveLength(0);
+
+    await mockSlack.sendEvent("evt-reaction-missing-scope-reply", {
+      type: "message",
+      user: "U123",
+      channel: "C123",
+      thread_ts: "115.220",
+      ts: "115.222",
+      text: "继续"
+    });
+    await waitForSessionIdle(tempRoot, "C123:115.220");
+    expect(mockSlack.reactionRequests).toHaveLength(1);
+  }, 60_000);
+
   it("replays missed thread messages after restart as a single recovered batch", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "slack-codex-broker-e2e-"));
     cleanups.push(async () => {

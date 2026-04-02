@@ -6,6 +6,7 @@ import type {
   SlackSessionRecord,
   SlackUserIdentity
 } from "../../types.js";
+import { getErrorMessage } from "../../utils/error.js";
 import { CodexBroker } from "../codex/codex-broker.js";
 import { SessionManager } from "../session-manager.js";
 import {
@@ -17,6 +18,7 @@ import { SlackApi } from "./slack-api.js";
 import { SlackConversationService } from "./slack-conversation-service.js";
 import { SlackSelfMessageFilter } from "./slack-self-filter.js";
 import { SlackSocketModeClient } from "./socket-mode-client.js";
+import { buildWorkspaceContext } from "./slack-context-builder.js";
 
 export class SlackCodexBridge {
   readonly #config: AppConfig;
@@ -26,6 +28,10 @@ export class SlackCodexBridge {
   readonly #slackSocket: SlackSocketModeClient;
   readonly #selfMessageFilter = new SlackSelfMessageFilter();
   readonly #conversations: SlackConversationService;
+  readonly #boundHandlers: {
+    readonly onReady: () => void;
+    readonly onEventsApi: (payload: unknown) => void;
+  };
   #botUserId = "";
   #botIdentity: SlackUserIdentity | null = null;
 
@@ -53,6 +59,19 @@ export class SlackCodexBridge {
       slackApi: this.#slackApi,
       selfMessageFilter: this.#selfMessageFilter
     });
+
+    // Pre-bind handlers to enable proper cleanup on stop()
+    this.#boundHandlers = {
+      onReady: () => {
+        void this.#conversations.recoverMissedThreadMessages("socket_ready");
+      },
+      onEventsApi: (payload) => {
+        void this.#handleEventsApi(payload as {
+          readonly event?: Record<string, any>;
+          readonly event_id?: string;
+        });
+      }
+    };
   }
 
   async start(): Promise<void> {
@@ -70,20 +89,15 @@ export class SlackCodexBridge {
 
     await this.#conversations.start();
 
-    this.#slackSocket.on("ready", () => {
-      void this.#conversations.recoverMissedThreadMessages("socket_ready");
-    });
-    this.#slackSocket.on("events_api", (payload) => {
-      void this.#handleEventsApi(payload as {
-        readonly event?: Record<string, any>;
-        readonly event_id?: string;
-      });
-    });
+    this.#slackSocket.on("ready", this.#boundHandlers.onReady);
+    this.#slackSocket.on("events_api", this.#boundHandlers.onEventsApi);
 
     await this.#slackSocket.start();
   }
 
   async stop(): Promise<void> {
+    this.#slackSocket.off("ready", this.#boundHandlers.onReady);
+    this.#slackSocket.off("events_api", this.#boundHandlers.onEventsApi);
     await this.#slackSocket.stop();
     await this.#conversations.stop();
     await this.#codex.stop();
@@ -133,6 +147,7 @@ export class SlackCodexBridge {
     readonly text: string;
     readonly kind?: "progress" | "final" | "block" | "wait" | undefined;
     readonly reason?: string | undefined;
+    readonly contextText?: string | undefined;
   }): Promise<void> {
     await this.#conversations.postSlackMessage(options);
   }
@@ -179,7 +194,7 @@ export class SlackCodexBridge {
     } catch (error) {
       logger.error("Failed to process Slack event", {
         eventId: payload.event_id,
-        error: error instanceof Error ? error.message : String(error)
+        error: getErrorMessage(error)
       });
     }
   }
@@ -266,7 +281,8 @@ export class SlackCodexBridge {
       await this.#conversations.postSlackMessage({
         channelId: parsed.channelId,
         rootThreadTs: parsed.rootThreadTs,
-        text: "I've joined this thread and I'm checking the context now. I'll be with you shortly."
+        text: "I've joined this thread and I'm checking the context now. I'll be with you shortly.",
+        contextText: buildWorkspaceContext(session)
       });
     }
 

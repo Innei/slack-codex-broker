@@ -209,13 +209,42 @@ export class SlackApi {
     );
   }
 
-  async postThreadMessage(channel: string, threadTs: string, text: string): Promise<string | undefined> {
+  async postThreadMessage(
+    channel: string,
+    threadTs: string,
+    text: string,
+    options?: {
+      readonly contextText?: string | undefined;
+    }
+  ): Promise<string | undefined> {
+    const blocks = options?.contextText
+      ? [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text
+            }
+          },
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: options.contextText
+              }
+            ]
+          }
+        ]
+      : undefined;
+
     const response = await this.#post<{ ts?: string }>(
       "chat.postMessage",
       {
         channel,
         thread_ts: threadTs,
-        text
+        text,
+        blocks
       },
       this.#botToken
     );

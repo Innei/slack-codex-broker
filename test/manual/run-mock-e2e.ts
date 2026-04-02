@@ -1,3 +1,4 @@
+import http from "node:http";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -11,6 +12,8 @@ async function main(): Promise<void> {
   const sessionsRoot = path.join(tempRoot, "sessions");
   const reposRoot = path.join(tempRoot, "repos");
   const codexHome = path.join(tempRoot, "codex-home");
+  const brokerPort = await getFreePort();
+  const codexAppServerPort = await getFreePort();
   const mockSlack = new MockSlackServer("UBOT");
 
   const slackPort = await mockSlack.start();
@@ -35,7 +38,8 @@ async function main(): Promise<void> {
       REPOS_ROOT: reposRoot,
       CODEX_HOME: codexHome,
       CODEX_AUTH_JSON_PATH: path.join(os.homedir(), ".codex", "auth.json"),
-      PORT: "3300",
+      CODEX_APP_SERVER_PORT: String(codexAppServerPort),
+      PORT: String(brokerPort),
       DEBUG: "1"
     },
     stdio: ["ignore", "pipe", "pipe"]
@@ -46,7 +50,7 @@ async function main(): Promise<void> {
 
   try {
     await mockSlack.waitForSocket();
-    await waitForHttpReady("http://127.0.0.1:3300");
+    await waitForHttpReady(`http://127.0.0.1:${brokerPort}`);
 
     await mockSlack.sendEvent("evt-pre-1", {
       type: "message",
@@ -66,7 +70,7 @@ async function main(): Promise<void> {
     console.log("Sent pre-thread history");
 
     const historyResponse = await fetch(
-      "http://127.0.0.1:3300/slack/thread-history?channel_id=C123&thread_ts=111.220&before_ts=111.221&limit=1&format=text"
+      `http://127.0.0.1:${brokerPort}/slack/thread-history?channel_id=C123&thread_ts=111.220&before_ts=111.221&limit=1&format=text`
     );
     const historyText = await historyResponse.text();
     if (!historyText.includes("ROOT_CONTEXT_ABC")) {
@@ -83,6 +87,9 @@ async function main(): Promise<void> {
     });
     console.log("Sent evt-1");
 
+    await mockSlack.waitForReaction((reaction) => reaction.channel === "C123" && reaction.messageTs === "111.222" && reaction.name === "eyes");
+    console.log("Reaction acked evt-1");
+
     await mockSlack.waitForPostedMessage((message) =>
       message.text.includes("I've joined this thread and I'm checking the context now.")
     );
@@ -98,6 +105,9 @@ async function main(): Promise<void> {
       text: "Reply with exactly the sender display name from the Slack metadata header."
     });
     console.log("Sent evt-2");
+
+    await mockSlack.waitForReaction((reaction) => reaction.channel === "C123" && reaction.messageTs === "111.223" && reaction.name === "eyes");
+    console.log("Reaction acked evt-2");
 
     const secondReply = await mockSlack.waitForPostedMessage((message) => message.text.includes("Mock Display 123"));
     console.log("Second reply:", secondReply.text);
@@ -134,6 +144,9 @@ async function main(): Promise<void> {
     });
     console.log("Sent evt-5");
 
+    await mockSlack.waitForReaction((reaction) => reaction.channel === "D123" && reaction.messageTs === "222.333" && reaction.name === "eyes");
+    console.log("Reaction acked evt-5");
+
     await mockSlack.waitForPostedMessage(
       (message) =>
         message.channel === "D123" &&
@@ -146,6 +159,24 @@ async function main(): Promise<void> {
     child.kill("SIGTERM");
     await mockSlack.stop();
   }
+}
+
+async function getFreePort(): Promise<number> {
+  const server = http.createServer();
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", () => resolve());
+  });
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("failed to allocate free port");
+  }
+
+  const port = address.port;
+  await new Promise<void>((resolve) => {
+    server.close(() => resolve());
+  });
+  return port;
 }
 
 async function waitForHttpReady(url: string, timeoutMs = 15_000): Promise<void> {

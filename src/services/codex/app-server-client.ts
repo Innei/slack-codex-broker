@@ -544,7 +544,7 @@ export class AppServerClient extends EventEmitter {
       readonly result?: JsonValue;
       readonly error?: { readonly message: string };
       readonly method?: string;
-      readonly params?: Record<string, any>;
+      readonly params?: unknown;
     };
     logger.raw("codex-rpc", {
       direction: "response",
@@ -577,8 +577,9 @@ export class AppServerClient extends EventEmitter {
       return;
     }
 
-    this.emit("notification", message.method, message.params);
-    this.#handleTurnEvent(message.method, message.params ?? {});
+    const params = normalizeNotificationParams(message.params);
+    this.emit("notification", message.method, params);
+    this.#handleTurnEvent(message.method, params);
   }
 
   #handleTurnEvent(method: string, params: Record<string, any>): void {
@@ -760,6 +761,14 @@ export class AppServerClient extends EventEmitter {
     this.#bufferedTurnNotifications.set(turnId, created);
     return created;
   }
+}
+
+function normalizeNotificationParams(value: unknown): Record<string, any> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, any>;
 }
 
 function normalizeTurnStatus(status: unknown): ReadTurnResult["status"] {

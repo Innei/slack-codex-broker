@@ -8,6 +8,13 @@ export interface PostedMessage {
   readonly threadTs: string;
   readonly text: string;
   readonly ts: string;
+  readonly blocks?: readonly Record<string, unknown>[] | undefined;
+}
+
+export interface AddedReaction {
+  readonly channel: string;
+  readonly messageTs: string;
+  readonly name: string;
 }
 
 export interface MockThreadMessage {
@@ -31,6 +38,8 @@ export class MockSlackServer {
   #socket: WebSocket | undefined;
   #nextTs = 9_000_000_000;
   readonly postedMessages: PostedMessage[] = [];
+  readonly reactionRequests: AddedReaction[] = [];
+  readonly addedReactions: AddedReaction[] = [];
   readonly #users = new Map<string, {
     readonly id: string;
     readonly name: string;
@@ -72,6 +81,7 @@ export class MockSlackServer {
     private readonly options?: {
       readonly botId?: string;
       readonly appId?: string;
+      readonly reactionError?: string;
     }
   ) {
     this.#server = http.createServer((request, response) => {
@@ -176,6 +186,21 @@ export class MockSlackServer {
     throw new Error("Timed out waiting for Slack message");
   }
 
+  async waitForReaction(predicate: (reaction: AddedReaction) => boolean, timeoutMs = 30_000): Promise<AddedReaction> {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+      const match = this.addedReactions.find(predicate);
+      if (match) {
+        return match;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    throw new Error("Timed out waiting for Slack reaction");
+  }
+
   recordThreadMessage(message: MockThreadMessage): void {
     const key = getThreadKey(message.channel, message.threadTs);
     const messages = this.#threadMessages.get(key) ?? [];
@@ -222,7 +247,8 @@ export class MockSlackServer {
         channel: String(body.channel),
         threadTs: String(body.thread_ts),
         text: String(body.text),
-        ts
+        ts,
+        blocks: readJsonArray(body.blocks)
       });
       this.recordThreadMessage({
         channel: String(body.channel),
@@ -238,6 +264,34 @@ export class MockSlackServer {
         JSON.stringify({
           ok: true,
           ts
+        })
+      );
+      return;
+    }
+
+    if (request.url === "/api/reactions.add") {
+      const reaction: AddedReaction = {
+        channel: String(body.channel),
+        messageTs: String(body.timestamp),
+        name: String(body.name)
+      };
+      this.reactionRequests.push(reaction);
+
+      response.writeHead(200, { "content-type": "application/json" });
+      if (this.options?.reactionError) {
+        response.end(
+          JSON.stringify({
+            ok: false,
+            error: this.options.reactionError
+          })
+        );
+        return;
+      }
+
+      this.addedReactions.push(reaction);
+      response.end(
+        JSON.stringify({
+          ok: true
         })
       );
       return;
@@ -336,4 +390,21 @@ async function readRequestBody(request: http.IncomingMessage): Promise<Record<st
 
 function getThreadKey(channel: string, threadTs: string): string {
   return `${channel}:${threadTs}`;
+}
+
+function readJsonArray(value: unknown): readonly Record<string, unknown>[] | undefined {
+  if (Array.isArray(value)) {
+    return value as readonly Record<string, unknown>[];
+  }
+
+  if (typeof value !== "string" || !value.trim()) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? (parsed as readonly Record<string, unknown>[]) : undefined;
+  } catch {
+    return undefined;
+  }
 }

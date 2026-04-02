@@ -317,6 +317,58 @@ describe("SlackApi assistant status and streaming helpers", () => {
   });
 });
 
+describe("SlackApi.postThreadMessage", () => {
+  it("includes context blocks when contextText is provided", async () => {
+    const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (!url.endsWith("/chat.postMessage")) {
+        throw new Error(`Unexpected fetch ${url}`);
+      }
+
+      const params = new URLSearchParams(String(init?.body));
+      expect(params.get("channel")).toBe("C123");
+      expect(params.get("thread_ts")).toBe("111.222");
+      expect(params.get("text")).toBe("hello");
+      expect(params.get("blocks")).toBe(JSON.stringify([
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "hello"
+          }
+        },
+        {
+          type: "context",
+          elements: [
+            {
+              type: "mrkdwn",
+              text: "📁 slack-codex-broker"
+            }
+          ]
+        }
+      ]));
+
+      return new Response(JSON.stringify({ ok: true, ts: "111.333" }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const api = new SlackApi({
+      baseUrl: "https://slack.test/api",
+      appToken: "xapp-test",
+      botToken: "xoxb-test"
+    });
+
+    await expect(
+      api.postThreadMessage("C123", "111.222", "hello", {
+        contextText: "📁 slack-codex-broker"
+      })
+    ).resolves.toBe("111.333");
+  });
+});
+
 describe("SlackApi.listThreadMessages", () => {
   it("preserves bot/app card messages with raw Slack payload", async () => {
     const fetchMock = vi.fn(async (input: string | URL) => {
