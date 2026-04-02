@@ -8,6 +8,7 @@ import type {
 const STREAM_START_DELAY_MS = 1_500;
 const STATUS_REFRESH_MS = 12_000;
 const FALLBACK_PHASE_ADVANCE_MS = 8_000;
+const RESPONSE_STREAM_FLUSH_INTERVAL_MS = 100;
 const MAX_LOG_LINE_LENGTH = 140;
 const MAX_TIMELINE_STEPS = 6;
 const MAX_LOADING_MESSAGES = 4;
@@ -50,6 +51,12 @@ interface RuntimePresenceState {
   lastActivityAt: number;
   streamStartTimer?: NodeJS.Timeout | undefined;
   fallbackAdvanceTimer?: NodeJS.Timeout | undefined;
+  // Response streaming state
+  responseStreamTs?: string | undefined;
+  responseStreamDisabled: boolean;
+  responseStreamText: string;
+  responseStreamLastSentLength: number;
+  responseStreamPendingFlush?: NodeJS.Timeout | undefined;
 }
 
 interface PresenceSlackApi {
@@ -169,7 +176,11 @@ export class SlackTurnPresence {
       nextStepSequence: 0,
       fallbackPhaseIndex: 0,
       answerPhaseStarted: false,
-      lastActivityAt: Date.now()
+      lastActivityAt: Date.now(),
+      // Response streaming state
+      responseStreamDisabled: false,
+      responseStreamText: "",
+      responseStreamLastSentLength: 0
     };
 
     this.#runtimeBySessionKey.set(options.session.key, runtime);
@@ -187,7 +198,7 @@ export class SlackTurnPresence {
     this.#scheduleFallbackAdvance(runtime);
   }
 
-  async noteTurnDelta(turnId: string): Promise<void> {
+  async noteTurnDelta(turnId: string, delta?: string, fullText?: string): Promise<void> {
     const runtime = this.#getByTurnId(turnId);
     if (!runtime) {
       return;
@@ -203,6 +214,11 @@ export class SlackTurnPresence {
       loadingMessages: ["正在整理回复", "正在压缩关键信息", "正在生成最终内容"],
       source: "delta"
     });
+
+    // Stream the actual response content if delta is provided
+    if (delta && fullText !== undefined) {
+      await this.#streamResponseDelta(runtime, delta, fullText);
+    }
   }
 
   async noteToolUse(
@@ -318,6 +334,12 @@ export class SlackTurnPresence {
     try {
       await this.#clearStatus(runtime);
 
+      // Stop the response stream first (always attempt if stream was started,
+      // even when responseStreamDisabled, to avoid leaving the Slack message in streaming state)
+      if (runtime.responseStreamTs) {
+        await this.#safeStopResponseStream(runtime);
+      }
+
       if (runtime.streamTs && !runtime.streamDisabled) {
         applyFinalTaskState(runtime, kind, reason);
         await this.#safeStopStream(runtime, summarizeEndKind(kind, reason));
@@ -346,6 +368,11 @@ export class SlackTurnPresence {
     if (runtime.fallbackAdvanceTimer) {
       clearTimeout(runtime.fallbackAdvanceTimer);
       runtime.fallbackAdvanceTimer = undefined;
+    }
+
+    if (runtime.responseStreamPendingFlush) {
+      clearTimeout(runtime.responseStreamPendingFlush);
+      runtime.responseStreamPendingFlush = undefined;
     }
   }
 
@@ -535,6 +562,144 @@ export class SlackTurnPresence {
         sessionKey: runtime.sessionKey,
         turnId: runtime.turnId,
         streamTs: runtime.streamTs,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  async #streamResponseDelta(runtime: RuntimePresenceState, delta: string, fullText: string): Promise<void> {
+    if (runtime.responseStreamDisabled || runtime.finalizing) {
+      return;
+    }
+
+    // Only accept if fullText is longer to prevent stale deltas from regressing the buffer
+    if (fullText.length > runtime.responseStreamText.length) {
+      runtime.responseStreamText = fullText;
+    }
+    runtime.lastActivityAt = Date.now();
+
+    // Debounce the flush to avoid too many API calls
+    if (runtime.responseStreamPendingFlush) {
+      return;
+    }
+
+    runtime.responseStreamPendingFlush = setTimeout(() => {
+      runtime.responseStreamPendingFlush = undefined;
+      void this.#flushResponseStream(runtime);
+    }, RESPONSE_STREAM_FLUSH_INTERVAL_MS);
+  }
+
+  async #flushResponseStream(runtime: RuntimePresenceState): Promise<void> {
+    if (runtime.responseStreamDisabled || runtime.finalizing) {
+      return;
+    }
+
+    const textToSend = runtime.responseStreamText;
+    if (textToSend.length <= runtime.responseStreamLastSentLength) {
+      return;
+    }
+
+    // Start a new response stream if we don't have one
+    if (!runtime.responseStreamTs) {
+      const started = await this.#safeStartResponseStream(runtime, textToSend);
+      if (!started) {
+        return;
+      }
+      runtime.responseStreamLastSentLength = textToSend.length;
+      return;
+    }
+
+    // Append the new content
+    const newContent = textToSend.slice(runtime.responseStreamLastSentLength);
+    if (!newContent) {
+      return;
+    }
+
+    try {
+      await this.#slackApi.appendThreadStream({
+        channelId: runtime.channelId,
+        streamTs: runtime.responseStreamTs,
+        markdownText: newContent
+      });
+      runtime.responseStreamLastSentLength = textToSend.length;
+      await this.#sessions.setLastSlackReplyAt(
+        runtime.channelId,
+        runtime.rootThreadTs,
+        new Date().toISOString()
+      );
+    } catch (error) {
+      runtime.responseStreamDisabled = true;
+      logger.warn("Failed to append Slack response stream", {
+        sessionKey: runtime.sessionKey,
+        turnId: runtime.turnId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  async #safeStartResponseStream(runtime: RuntimePresenceState, text: string): Promise<boolean> {
+    try {
+      const ts = await this.#slackApi.startThreadStream({
+        channelId: runtime.channelId,
+        threadTs: runtime.rootThreadTs,
+        recipientUserId: runtime.recipientUserId,
+        recipientTeamId: runtime.recipientTeamId,
+        markdownText: text
+      });
+
+      if (!ts) {
+        runtime.responseStreamDisabled = true;
+        return false;
+      }
+
+      runtime.responseStreamTs = ts;
+      await this.#sessions.setLastSlackReplyAt(
+        runtime.channelId,
+        runtime.rootThreadTs,
+        new Date().toISOString()
+      );
+      return true;
+    } catch (error) {
+      runtime.responseStreamDisabled = true;
+      logger.warn("Failed to start Slack response stream", {
+        sessionKey: runtime.sessionKey,
+        turnId: runtime.turnId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return false;
+    }
+  }
+
+  async #safeStopResponseStream(runtime: RuntimePresenceState): Promise<void> {
+    if (!runtime.responseStreamTs) {
+      return;
+    }
+
+    // Clear any pending flush
+    if (runtime.responseStreamPendingFlush) {
+      clearTimeout(runtime.responseStreamPendingFlush);
+      runtime.responseStreamPendingFlush = undefined;
+    }
+
+    // Flush any remaining content
+    const remainingText = runtime.responseStreamText.slice(runtime.responseStreamLastSentLength);
+
+    try {
+      await this.#slackApi.stopThreadStream({
+        channelId: runtime.channelId,
+        streamTs: runtime.responseStreamTs,
+        markdownText: remainingText || undefined
+      });
+      await this.#sessions.setLastSlackReplyAt(
+        runtime.channelId,
+        runtime.rootThreadTs,
+        new Date().toISOString()
+      );
+    } catch (error) {
+      logger.warn("Failed to stop Slack response stream", {
+        sessionKey: runtime.sessionKey,
+        turnId: runtime.turnId,
+        streamTs: runtime.responseStreamTs,
         error: error instanceof Error ? error.message : String(error)
       });
     }
