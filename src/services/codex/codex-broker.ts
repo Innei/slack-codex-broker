@@ -196,15 +196,32 @@ export class CodexBroker extends EventEmitter {
         return;
       }
 
+      // Debug: log tool-related events to identify the correct event names
+      if (method.includes("tool") || method.includes("Tool")) {
+        logger.debug("Codex tool notification", { method, paramKeys: Object.keys(params) });
+      }
+
       // Emit tool use events for presence updates
-      if (method === "item/toolUse/start" || method === "item/toolUse") {
-        const toolName = params.toolName as string | undefined;
-        const turnId = params.turnId as string | undefined;
+      // Handle various possible event naming conventions from Codex app-server
+      const isToolEvent =
+        method === "item/toolUse/start" ||
+        method === "item/toolUse" ||
+        method === "item/toolCall/start" ||
+        method === "item/toolCall" ||
+        method === "tool/start" ||
+        method === "tool/use";
+
+      if (isToolEvent) {
+        // Try different param structures the server might use
+        const toolName = (params.toolName ?? params.tool_name ?? params.name ?? params.tool) as string | undefined;
+        const turnId = (params.turnId ?? params.turn_id) as string | undefined;
+        const toolParams = (params.params ?? params.arguments ?? params.input) as Record<string, unknown> | undefined;
+
         if (toolName && turnId) {
           this.emit("tool_use", {
             turnId,
             toolName,
-            params: params.params as Record<string, unknown> | undefined
+            params: toolParams
           });
         }
       }
