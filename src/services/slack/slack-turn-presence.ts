@@ -205,6 +205,30 @@ export class SlackTurnPresence {
     });
   }
 
+  async noteToolUse(
+    turnId: string,
+    toolName: string,
+    params?: Record<string, unknown>
+  ): Promise<void> {
+    const runtime = this.#getByTurnId(turnId);
+    if (!runtime || runtime.finalizing) {
+      return;
+    }
+
+    runtime.lastActivityAt = Date.now();
+    const toolDisplay = formatToolCallForDisplay(toolName, params);
+    const phaseInfo = classifyToolPhase(toolName);
+
+    await this.#activatePhase(runtime, {
+      title: phaseInfo.title,
+      line: toolDisplay,
+      details: toolDisplay,
+      loadingMessages: [toolDisplay, ...phaseInfo.loadingMessages],
+      source: "delta",
+      announce: false
+    });
+  }
+
   async noteSlackMessage(options: {
     readonly session: SlackSessionRecord;
     readonly kind?: "progress" | "final" | "block" | "wait" | undefined;
@@ -804,4 +828,84 @@ function truncateLogLine(value: string): string {
   }
 
   return `${trimmed.slice(0, MAX_LOG_LINE_LENGTH - 1)}…`;
+}
+
+/**
+ * Format a tool call for display in loading messages.
+ * e.g., "Glob" with pattern -> "Searching for: src/*.ts"
+ */
+function formatToolCallForDisplay(toolName: string, params?: Record<string, unknown>): string {
+  const normalizedName = toolName.replace(/^mcp__\w+__/, "");
+
+  switch (normalizedName.toLowerCase()) {
+    case "glob":
+    case "search":
+      return `Searching for: ${params?.pattern ?? params?.query ?? "files"}`;
+    case "grep":
+      return `Searching: ${params?.pattern ?? "content"}`;
+    case "read":
+      return `Reading: ${formatPath(params?.file_path ?? params?.path)}`;
+    case "write":
+      return `Writing: ${formatPath(params?.file_path ?? params?.path)}`;
+    case "edit":
+      return `Editing: ${formatPath(params?.file_path ?? params?.path)}`;
+    case "bash":
+      return `Running: ${truncateLogLine(String(params?.command ?? "command"))}`;
+    case "webfetch":
+    case "web_fetch":
+      return `Fetching: ${formatUrl(params?.url)}`;
+    case "websearch":
+    case "web_search":
+      return `Searching: ${params?.query ?? "web"}`;
+    default:
+      return `Using: ${normalizedName}`;
+  }
+}
+
+function formatPath(value: unknown): string {
+  if (typeof value !== "string") {
+    return "file";
+  }
+  const parts = value.split("/");
+  return parts[parts.length - 1] ?? value;
+}
+
+function formatUrl(value: unknown): string {
+  if (typeof value !== "string") {
+    return "URL";
+  }
+  try {
+    const url = new URL(value);
+    return url.hostname + (url.pathname !== "/" ? url.pathname.slice(0, 30) : "");
+  } catch {
+    return truncateLogLine(value);
+  }
+}
+
+/**
+ * Classify tool into a phase for the timeline.
+ */
+function classifyToolPhase(toolName: string): {
+  readonly title: string;
+  readonly loadingMessages: readonly string[];
+} {
+  const normalizedName = toolName.replace(/^mcp__\w+__/, "").toLowerCase();
+
+  const toolPhases: Record<string, { title: string; loadingMessages: readonly string[] }> = {
+    glob: { title: "搜索文件", loadingMessages: ["正在搜索文件", "正在匹配模式"] },
+    grep: { title: "搜索内容", loadingMessages: ["正在搜索内容", "正在匹配文本"] },
+    read: { title: "读取文件", loadingMessages: ["正在读取文件", "正在加载内容"] },
+    write: { title: "写入文件", loadingMessages: ["正在写入文件", "正在保存内容"] },
+    edit: { title: "编辑文件", loadingMessages: ["正在编辑文件", "正在修改内容"] },
+    bash: { title: "执行命令", loadingMessages: ["正在执行命令", "正在等待结果"] },
+    webfetch: { title: "获取网页", loadingMessages: ["正在获取网页", "正在下载内容"] },
+    web_fetch: { title: "获取网页", loadingMessages: ["正在获取网页", "正在下载内容"] },
+    websearch: { title: "搜索网络", loadingMessages: ["正在搜索网络", "正在查找信息"] },
+    web_search: { title: "搜索网络", loadingMessages: ["正在搜索网络", "正在查找信息"] }
+  };
+
+  return toolPhases[normalizedName] ?? {
+    title: "使用工具",
+    loadingMessages: ["正在使用工具", "正在处理请求"]
+  };
 }

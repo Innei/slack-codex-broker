@@ -124,6 +124,13 @@ export class SlackConversationService {
     options.codex.on("turn_delta", (payload: { turnId: string }) => {
       void this.#turnPresence.noteTurnDelta(payload.turnId);
     });
+    options.codex.on("tool_use", (payload: {
+      turnId: string;
+      toolName: string;
+      params?: Record<string, unknown>;
+    }) => {
+      void this.#turnPresence.noteToolUse(payload.turnId, payload.toolName, payload.params);
+    });
   }
 
   setBotUserId(botUserId: string): void {

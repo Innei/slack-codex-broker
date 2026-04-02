@@ -191,6 +191,24 @@ export class CodexBroker extends EventEmitter {
 
       this.emit("turn_delta", payload);
     });
+    client.on("notification", (method: string, params: Record<string, unknown>) => {
+      if (client !== this.#client) {
+        return;
+      }
+
+      // Emit tool use events for presence updates
+      if (method === "item/toolUse/start" || method === "item/toolUse") {
+        const toolName = params.toolName as string | undefined;
+        const turnId = params.turnId as string | undefined;
+        if (toolName && turnId) {
+          this.emit("tool_use", {
+            turnId,
+            toolName,
+            params: params.params as Record<string, unknown> | undefined
+          });
+        }
+      }
+    });
     client.on("disconnected", (error) => {
       if (this.#ignoredDisconnectClients.has(client)) {
         return;
