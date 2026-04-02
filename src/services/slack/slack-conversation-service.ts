@@ -41,6 +41,10 @@ import {
   shouldNotifySlackFailure,
   shouldAutoRecoverSession
 } from "./slack-conversation-utils.js";
+import {
+  buildErrorContext,
+  buildWorkspaceContext
+} from "./slack-context-builder.js";
 import { SlackInboundStore } from "./slack-inbound-store.js";
 import {
   formatSlackHistoryContextForCodex
@@ -1176,10 +1180,14 @@ export class SlackConversationService {
           nowMs
         })) {
           if (shouldPostSlackRunFailure(error)) {
+            const errorContext = session.activeTurnId
+              ? buildErrorContext({ sessionKey: session.key, turnId: session.activeTurnId })
+              : buildErrorContext({ sessionKey: session.key });
             await this.#postBotThreadMessage(
               session.channelId,
               session.rootThreadTs,
-              formatSlackRunFailureMessage(error)
+              formatSlackRunFailureMessage(error),
+              { contextText: errorContext }
             );
             runtime.lastFailureNotificationFingerprint = createSlackFailureFingerprint(error);
             runtime.lastFailureNotificationAtMs = nowMs;

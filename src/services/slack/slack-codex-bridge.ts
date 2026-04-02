@@ -18,6 +18,7 @@ import { SlackApi } from "./slack-api.js";
 import { SlackConversationService } from "./slack-conversation-service.js";
 import { SlackSelfMessageFilter } from "./slack-self-filter.js";
 import { SlackSocketModeClient } from "./socket-mode-client.js";
+import { buildWorkspaceContext } from "./slack-context-builder.js";
 
 export class SlackCodexBridge {
   readonly #config: AppConfig;
@@ -280,7 +281,8 @@ export class SlackCodexBridge {
       await this.#conversations.postSlackMessage({
         channelId: parsed.channelId,
         rootThreadTs: parsed.rootThreadTs,
-        text: "I've joined this thread and I'm checking the context now. I'll be with you shortly."
+        text: "I've joined this thread and I'm checking the context now. I'll be with you shortly.",
+        contextText: buildWorkspaceContext(session)
       });
     }
 
