@@ -19,6 +19,7 @@ import { SlackConversationService } from "./slack-conversation-service.js";
 import { SlackSelfMessageFilter } from "./slack-self-filter.js";
 import { SlackSocketModeClient } from "./socket-mode-client.js";
 import { buildWorkspaceContext } from "./slack-context-builder.js";
+import { parseSlashCommand, executeSlashCommand, type ParsedSlashCommand } from "./slash-commands.js";
 
 export class SlackCodexBridge {
   readonly #config: AppConfig;
@@ -210,13 +211,20 @@ export class SlackCodexBridge {
     }
 
     switch (parsed.route) {
-      case "app_mention":
+      case "app_mention": {
+        // Slash commands on @mention require an existing session
+        const existing = this.#sessions.getSession(parsed.channelId, parsed.rootThreadTs);
+        if (existing && await this.#trySlashCommand(parsed, existing)) {
+          return;
+        }
+
         await this.#handleInteractiveSessionEvent(parsed, {
           createSession: true,
           preloadHistory: parsed.rootThreadTs !== parsed.messageTs
         });
         return;
-      case "direct_message":
+      }
+      case "direct_message": {
         if (parsed.controlText === "-stop" && (parsed.input.images?.length ?? 0) === 0) {
           const existing = this.#sessions.getSession(parsed.channelId, parsed.rootThreadTs);
           if (existing) {
@@ -225,11 +233,18 @@ export class SlackCodexBridge {
           return;
         }
 
+        // Slash commands in DMs require an existing session
+        const existing = this.#sessions.getSession(parsed.channelId, parsed.rootThreadTs);
+        if (existing && await this.#trySlashCommand(parsed, existing)) {
+          return;
+        }
+
         await this.#handleInteractiveSessionEvent(parsed, {
           createSession: true,
           preloadHistory: false
         });
         return;
+      }
       case "thread_reply": {
         const session = this.#sessions.getSession(parsed.channelId, parsed.rootThreadTs);
         if (!session) {
@@ -245,6 +260,10 @@ export class SlackCodexBridge {
           return;
         }
 
+        if (await this.#trySlashCommand(parsed, session)) {
+          return;
+        }
+
         if (isSlackMessageEffectivelyEmpty(parsed.input.text, parsed.input.images, parsed.input.slackMessage)) {
           return;
         }
@@ -255,6 +274,24 @@ export class SlackCodexBridge {
       default:
         return;
     }
+  }
+
+  /**
+   * Attempt to handle a slash command. Returns true if a command was matched and handled.
+   * Only triggers when images are not attached and the session already exists.
+   */
+  async #trySlashCommand(parsed: ParsedSlackEvent, session: SlackSessionRecord): Promise<boolean> {
+    if ((parsed.input.images?.length ?? 0) > 0) {
+      return false;
+    }
+
+    const slashCommand = parseSlashCommand(parsed.controlText);
+    if (!slashCommand) {
+      return false;
+    }
+
+    await this.#handleSlashCommand(parsed, slashCommand, session);
+    return true;
   }
 
   async #handleInteractiveSessionEvent(
@@ -315,5 +352,46 @@ export class SlackCodexBridge {
       rootThreadTs: session.rootThreadTs,
       text: stopped ? "Stopped the current run." : "No active run to stop."
     });
+  }
+
+  async #handleSlashCommand(
+    parsed: ParsedSlackEvent,
+    slashCommand: ParsedSlashCommand,
+    session: SlackSessionRecord
+  ): Promise<void> {
+    logger.info("Handling slash command", {
+      command: slashCommand.command,
+      args: slashCommand.args,
+      channelId: parsed.channelId,
+      rootThreadTs: parsed.rootThreadTs
+    });
+
+    try {
+      const result = await executeSlashCommand(slashCommand, {
+        config: this.#config,
+        sessions: this.#sessions,
+        codex: this.#codex,
+        channelId: parsed.channelId,
+        rootThreadTs: parsed.rootThreadTs,
+        session
+      });
+
+      await this.#conversations.postSlackMessage({
+        channelId: parsed.channelId,
+        rootThreadTs: parsed.rootThreadTs,
+        text: result.text
+      });
+    } catch (error) {
+      logger.error("Failed to execute slash command", {
+        command: slashCommand.command,
+        error: getErrorMessage(error)
+      });
+
+      await this.#conversations.postSlackMessage({
+        channelId: parsed.channelId,
+        rootThreadTs: parsed.rootThreadTs,
+        text: `Failed to execute command: ${getErrorMessage(error)}`
+      });
+    }
   }
 }
