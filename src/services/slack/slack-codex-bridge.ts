@@ -6,8 +6,8 @@ import type {
   SlackSessionRecord,
   SlackUserIdentity
 } from "../../types.js";
-import { getErrorMessage } from "../../utils/error.js";
 import { CodexBroker } from "../codex/codex-broker.js";
+import { GitHubAuthorMappingService } from "../github-author-mapping-service.js";
 import { SessionManager } from "../session-manager.js";
 import {
   type ParsedSlackEvent,
@@ -15,11 +15,10 @@ import {
   parseSlackEvent
 } from "./slack-event-parser.js";
 import { SlackApi } from "./slack-api.js";
+import { SlackCoauthorService } from "./slack-coauthor-service.js";
 import { SlackConversationService } from "./slack-conversation-service.js";
 import { SlackSelfMessageFilter } from "./slack-self-filter.js";
 import { SlackSocketModeClient } from "./socket-mode-client.js";
-import { buildWorkspaceContext } from "./slack-context-builder.js";
-import { parseSlashCommand, executeSlashCommand, type ParsedSlashCommand } from "./slash-commands.js";
 
 export class SlackCodexBridge {
   readonly #config: AppConfig;
@@ -28,11 +27,8 @@ export class SlackCodexBridge {
   readonly #slackApi: SlackApi;
   readonly #slackSocket: SlackSocketModeClient;
   readonly #selfMessageFilter = new SlackSelfMessageFilter();
+  readonly #coauthors: SlackCoauthorService;
   readonly #conversations: SlackConversationService;
-  readonly #boundHandlers: {
-    readonly onReady: () => void;
-    readonly onEventsApi: (payload: unknown) => void;
-  };
   #botUserId = "";
   #botIdentity: SlackUserIdentity | null = null;
 
@@ -40,6 +36,7 @@ export class SlackCodexBridge {
     readonly config: AppConfig;
     readonly sessions: SessionManager;
     readonly codex: CodexBroker;
+    readonly mappings: GitHubAuthorMappingService;
   }) {
     this.#config = options.config;
     this.#sessions = options.sessions;
@@ -53,26 +50,19 @@ export class SlackCodexBridge {
       api: this.#slackApi,
       socketOpenPath: this.#config.slackSocketOpenUrl
     });
+    this.#coauthors = new SlackCoauthorService({
+      sessions: this.#sessions,
+      slackApi: this.#slackApi,
+      mappings: options.mappings
+    });
     this.#conversations = new SlackConversationService({
       config: this.#config,
       sessions: this.#sessions,
       codex: this.#codex,
       slackApi: this.#slackApi,
-      selfMessageFilter: this.#selfMessageFilter
+      selfMessageFilter: this.#selfMessageFilter,
+      coauthors: this.#coauthors
     });
-
-    // Pre-bind handlers to enable proper cleanup on stop()
-    this.#boundHandlers = {
-      onReady: () => {
-        void this.#conversations.recoverMissedThreadMessages("socket_ready");
-      },
-      onEventsApi: (payload) => {
-        void this.#handleEventsApi(payload as {
-          readonly event?: Record<string, any>;
-          readonly event_id?: string;
-        });
-      }
-    };
   }
 
   async start(): Promise<void> {
@@ -83,7 +73,6 @@ export class SlackCodexBridge {
     this.#botUserId = auth.userId;
     this.#selfMessageFilter.setIdentity(auth);
     this.#conversations.setBotUserId(auth.userId);
-    this.#conversations.setSlackTeamId(auth.teamId);
 
     this.#botIdentity = await this.#slackApi.getUserIdentity(this.#botUserId);
     this.#codex.setSlackBotIdentity(this.#botIdentity);
@@ -92,13 +81,12 @@ export class SlackCodexBridge {
 
     this.#slackSocket.on("ready", this.#boundHandlers.onReady);
     this.#slackSocket.on("events_api", this.#boundHandlers.onEventsApi);
+    this.#slackSocket.on("interactive", this.#boundHandlers.onInteractive);
 
     await this.#slackSocket.start();
   }
 
   async stop(): Promise<void> {
-    this.#slackSocket.off("ready", this.#boundHandlers.onReady);
-    this.#slackSocket.off("events_api", this.#boundHandlers.onEventsApi);
     await this.#slackSocket.stop();
     await this.#conversations.stop();
     await this.#codex.stop();
@@ -148,7 +136,6 @@ export class SlackCodexBridge {
     readonly text: string;
     readonly kind?: "progress" | "final" | "block" | "wait" | undefined;
     readonly reason?: string | undefined;
-    readonly contextText?: string | undefined;
   }): Promise<void> {
     await this.#conversations.postSlackMessage(options);
   }
@@ -177,6 +164,29 @@ export class SlackCodexBridge {
     return await this.#conversations.postSlackFile(options);
   }
 
+  async listGitHubAuthorMappings() {
+    return await this.#coauthors.listMappings();
+  }
+
+  async upsertGitHubAuthorMapping(options: {
+    readonly slackUserId: string;
+    readonly githubAuthor: string;
+  }) {
+    return await this.#coauthors.upsertManualMapping(options);
+  }
+
+  async deleteGitHubAuthorMapping(slackUserId: string): Promise<void> {
+    await this.#coauthors.deleteMapping(slackUserId);
+  }
+
+  async resolveCommitCoauthors(options: {
+    readonly cwd: string;
+    readonly commitMessage: string;
+    readonly primaryAuthorEmail?: string | undefined;
+  }) {
+    return await this.#coauthors.resolveCommitCoauthors(options);
+  }
+
   async #handleEventsApi(payload: {
     readonly event?: Record<string, any>;
     readonly event_id?: string;
@@ -195,7 +205,17 @@ export class SlackCodexBridge {
     } catch (error) {
       logger.error("Failed to process Slack event", {
         eventId: payload.event_id,
-        error: getErrorMessage(error)
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  async #handleInteractive(payload: Record<string, unknown>): Promise<void> {
+    try {
+      await this.#coauthors.handleInteractivePayload(payload);
+    } catch (error) {
+      logger.error("Failed to process Slack interactive payload", {
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }
@@ -211,20 +231,13 @@ export class SlackCodexBridge {
     }
 
     switch (parsed.route) {
-      case "app_mention": {
-        // Slash commands on @mention require an existing session
-        const existing = this.#sessions.getSession(parsed.channelId, parsed.rootThreadTs);
-        if (existing && await this.#trySlashCommand(parsed, existing)) {
-          return;
-        }
-
+      case "app_mention":
         await this.#handleInteractiveSessionEvent(parsed, {
           createSession: true,
           preloadHistory: parsed.rootThreadTs !== parsed.messageTs
         });
         return;
-      }
-      case "direct_message": {
+      case "direct_message":
         if (parsed.controlText === "-stop" && (parsed.input.images?.length ?? 0) === 0) {
           const existing = this.#sessions.getSession(parsed.channelId, parsed.rootThreadTs);
           if (existing) {
@@ -233,18 +246,11 @@ export class SlackCodexBridge {
           return;
         }
 
-        // Slash commands in DMs require an existing session
-        const existing = this.#sessions.getSession(parsed.channelId, parsed.rootThreadTs);
-        if (existing && await this.#trySlashCommand(parsed, existing)) {
-          return;
-        }
-
         await this.#handleInteractiveSessionEvent(parsed, {
           createSession: true,
           preloadHistory: false
         });
         return;
-      }
       case "thread_reply": {
         const session = this.#sessions.getSession(parsed.channelId, parsed.rootThreadTs);
         if (!session) {
@@ -260,10 +266,6 @@ export class SlackCodexBridge {
           return;
         }
 
-        if (await this.#trySlashCommand(parsed, session)) {
-          return;
-        }
-
         if (isSlackMessageEffectivelyEmpty(parsed.input.text, parsed.input.images, parsed.input.slackMessage)) {
           return;
         }
@@ -274,24 +276,6 @@ export class SlackCodexBridge {
       default:
         return;
     }
-  }
-
-  /**
-   * Attempt to handle a slash command. Returns true if a command was matched and handled.
-   * Only triggers when images are not attached and the session already exists.
-   */
-  async #trySlashCommand(parsed: ParsedSlackEvent, session: SlackSessionRecord): Promise<boolean> {
-    if ((parsed.input.images?.length ?? 0) > 0) {
-      return false;
-    }
-
-    const slashCommand = parseSlashCommand(parsed.controlText);
-    if (!slashCommand) {
-      return false;
-    }
-
-    await this.#handleSlashCommand(parsed, slashCommand, session);
-    return true;
   }
 
   async #handleInteractiveSessionEvent(
@@ -318,8 +302,7 @@ export class SlackCodexBridge {
       await this.#conversations.postSlackMessage({
         channelId: parsed.channelId,
         rootThreadTs: parsed.rootThreadTs,
-        text: "I've joined this thread and I'm checking the context now. I'll be with you shortly.",
-        contextText: buildWorkspaceContext(session)
+        text: "I've joined this thread and I'm checking the context now. I'll be with you shortly."
       });
     }
 
@@ -352,46 +335,5 @@ export class SlackCodexBridge {
       rootThreadTs: session.rootThreadTs,
       text: stopped ? "Stopped the current run." : "No active run to stop."
     });
-  }
-
-  async #handleSlashCommand(
-    parsed: ParsedSlackEvent,
-    slashCommand: ParsedSlashCommand,
-    session: SlackSessionRecord
-  ): Promise<void> {
-    logger.info("Handling slash command", {
-      command: slashCommand.command,
-      args: slashCommand.args,
-      channelId: parsed.channelId,
-      rootThreadTs: parsed.rootThreadTs
-    });
-
-    try {
-      const result = await executeSlashCommand(slashCommand, {
-        config: this.#config,
-        sessions: this.#sessions,
-        codex: this.#codex,
-        channelId: parsed.channelId,
-        rootThreadTs: parsed.rootThreadTs,
-        session
-      });
-
-      await this.#conversations.postSlackMessage({
-        channelId: parsed.channelId,
-        rootThreadTs: parsed.rootThreadTs,
-        text: result.text
-      });
-    } catch (error) {
-      logger.error("Failed to execute slash command", {
-        command: slashCommand.command,
-        error: getErrorMessage(error)
-      });
-
-      await this.#conversations.postSlackMessage({
-        channelId: parsed.channelId,
-        rootThreadTs: parsed.rootThreadTs,
-        text: `Failed to execute command: ${getErrorMessage(error)}`
-      });
-    }
   }
 }

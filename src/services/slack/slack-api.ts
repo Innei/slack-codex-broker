@@ -125,7 +125,11 @@ export class SlackApi {
         channel_id: options.channelId,
         thread_ts: options.threadTs,
         status: options.status,
-        loading_messages: options.loadingMessages?.slice(0, 10)
+        loading_messages: options.loadingMessages?.length
+          ? options.loadingMessages.slice(0, 10)
+          : options.status.trim()
+            ? options.status
+            : undefined
       },
       this.#botToken
     );
@@ -195,14 +199,15 @@ export class SlackApi {
 
   async addReaction(options: {
     readonly channelId: string;
-    readonly messageTs: string;
     readonly name: string;
+    readonly messageTs?: string | undefined;
+    readonly timestamp?: string | undefined;
   }): Promise<void> {
     await this.#post(
       "reactions.add",
       {
         channel: options.channelId,
-        timestamp: options.messageTs,
+        timestamp: options.timestamp ?? options.messageTs,
         name: options.name
       },
       this.#botToken
@@ -256,6 +261,59 @@ export class SlackApi {
     });
 
     return response.ts;
+  }
+
+  async postEphemeral(options: {
+    readonly channelId: string;
+    readonly threadTs?: string | undefined;
+    readonly userId: string;
+    readonly text: string;
+    readonly blocks?: readonly Record<string, unknown>[] | undefined;
+  }): Promise<string | undefined> {
+    const response = await this.#post<{ message_ts?: string; ts?: string }>(
+      "chat.postEphemeral",
+      {
+        channel: options.channelId,
+        user: options.userId,
+        thread_ts: options.threadTs,
+        text: options.text,
+        blocks: options.blocks ? JSON.stringify(options.blocks) : undefined
+      },
+      this.#botToken
+    );
+
+    return response.message_ts ?? response.ts;
+  }
+
+  async openView(options: {
+    readonly triggerId: string;
+    readonly view: Record<string, unknown>;
+  }): Promise<void> {
+    await this.#post(
+      "views.open",
+      {
+        trigger_id: options.triggerId,
+        view: JSON.stringify(options.view)
+      },
+      this.#botToken
+    );
+  }
+
+
+  async removeReaction(options: {
+    readonly channelId: string;
+    readonly timestamp: string;
+    readonly name: string;
+  }): Promise<void> {
+    await this.#post(
+      "reactions.remove",
+      {
+        channel: options.channelId,
+        timestamp: options.timestamp,
+        name: options.name
+      },
+      this.#botToken
+    );
   }
 
   async uploadThreadFile(options: {
@@ -467,6 +525,7 @@ export class SlackApi {
           display_name_normalized?: string;
           real_name?: string;
           real_name_normalized?: string;
+          email?: string;
         };
       };
     }>(
@@ -497,7 +556,8 @@ export class SlackApi {
       mention: `<@${response.user.id}>`,
       username,
       displayName,
-      realName
+      realName,
+      email: normalizeSlackField(response.user.profile?.email)?.toLowerCase()
     };
   }
 

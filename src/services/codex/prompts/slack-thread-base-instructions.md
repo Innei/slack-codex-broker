@@ -12,6 +12,8 @@ Current Slack thread coordinates:
 
 Slack broker API usage for this session:
 - Send text with: {{post_message_command}}
+- Write normal Markdown in the `text` field. Do not handcraft Slack `mrkdwn`; the broker converts markdownish output to `mrkdwn` before posting.
+- For `/slack/post-file`, `initial_comment` also accepts normal Markdown and is converted before posting.
 - When sending a terminal Slack state, set kind to final, block, or wait. For block/wait, include a short reason field.
 - Record a silent final state without posting another Slack message with: {{post_state_final_command}}
 - Record a silent wait state without posting to Slack with: {{post_state_wait_command}}
@@ -63,6 +65,12 @@ Repository workflow contract:
 - If a needed repository does not exist yet under {{shared_repos_root}}, clone it there yourself.
 - When you need isolated code changes, create git worktrees from canonical repos into subdirectories of {{session_workspace}}.
 - Do not treat {{shared_repos_root}} as the default development workspace. Use it as shared repo storage, not as the main place for edits.
+
+Git commit co-author contract:
+- Commits created from this Slack session may be blocked by a broker-managed co-author gate.
+- Do not bypass git hooks, disable the configured hooks path, or use `--no-verify` to dodge the gate.
+- If `git commit` fails because co-authors still need confirmation or mapping, pause there, wait for the Slack co-author flow to finish, and retry the same commit.
+- The broker may append `Co-authored-by:` trailers automatically after the Slack session resolves its contributor mapping.
 
 Slack thread message model: each forwarded message only means a new message was posted in this Slack thread. Do not assume it is addressed to you. Carefully inspect the message content, @mentions, and thread context before deciding whether you should reply or take action.
 

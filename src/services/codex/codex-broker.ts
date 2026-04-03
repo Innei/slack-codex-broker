@@ -7,13 +7,11 @@ import type {
   AppServerAccountSummary,
   CodexInputItem,
   AppServerRateLimitsResponse,
-  CommandExecutionEvent,
   ReadTurnResultOptions,
   ReadTurnResult,
   StartedTurn
 } from "./app-server-client.js";
 import { logger } from "../../logger.js";
-import { getErrorMessage, isRecoverableCodexConnectionError } from "../../utils/error.js";
 import { getPersonalMemoryPath } from "./codex-home.js";
 
 export class CodexBroker extends EventEmitter {
@@ -64,6 +62,7 @@ export class CodexBroker extends EventEmitter {
     }
 
     this.#appServerProcess = new AppServerProcess({
+      brokerHttpBaseUrl: options.brokerHttpBaseUrl,
       codexHome: options.codexHome,
       hostCodexHomePath: options.hostCodexHomePath,
       hostGeminiHomePath: options.hostGeminiHomePath,
@@ -185,66 +184,13 @@ export class CodexBroker extends EventEmitter {
   }
 
   #bindClient(client: AppServerClient): void {
-    client.on("turn_delta", (payload) => {
+    client.on("notification", (method, params) => {
       if (client !== this.#client) {
         return;
       }
-
-      this.emit("turn_delta", payload);
+      this.emit("notification", method, params);
     });
-    client.on("command_execution", (payload: CommandExecutionEvent) => {
-      if (client !== this.#client) {
-        return;
-      }
 
-      this.emit("command_execution", payload);
-    });
-    client.on("notification", (method: string, params: Record<string, unknown>) => {
-      if (client !== this.#client) {
-        return;
-      }
-
-      const notificationParams = normalizeNotificationParams(params);
-
-      // Debug: log tool-related events to identify the correct event names
-      if (method.includes("tool") || method.includes("Tool")) {
-        logger.debug("Codex tool notification", { method, paramKeys: Object.keys(notificationParams) });
-      }
-
-      // Emit tool use events for presence updates
-      // Handle various possible event naming conventions from Codex app-server
-      const isToolEvent =
-        method === "item/toolUse/start" ||
-        method === "item/toolUse" ||
-        method === "item/toolCall/start" ||
-        method === "item/toolCall" ||
-        method === "tool/start" ||
-        method === "tool/use";
-
-      if (isToolEvent) {
-        // Try different param structures the server might use
-        const toolName = (
-          notificationParams.toolName ??
-          notificationParams.tool_name ??
-          notificationParams.name ??
-          notificationParams.tool
-        ) as string | undefined;
-        const turnId = (notificationParams.turnId ?? notificationParams.turn_id) as string | undefined;
-        const toolParams = (
-          notificationParams.params ??
-          notificationParams.arguments ??
-          notificationParams.input
-        ) as Record<string, unknown> | undefined;
-
-        if (toolName && turnId) {
-          this.emit("tool_use", {
-            turnId,
-            toolName,
-            params: toolParams
-          });
-        }
-      }
-    });
     client.on("disconnected", (error) => {
       if (this.#ignoredDisconnectClients.has(client)) {
         return;
@@ -259,7 +205,7 @@ export class CodexBroker extends EventEmitter {
         return;
       }
 
-      this.#handleClientDisconnect(new Error(getErrorMessage(error)));
+      this.#handleClientDisconnect(error instanceof Error ? error : new Error(String(error)));
     });
   }
 
@@ -277,7 +223,7 @@ export class CodexBroker extends EventEmitter {
         throw error;
       }
 
-      await this.#recoverClient(new Error(getErrorMessage(error)));
+      await this.#recoverClient(error instanceof Error ? error : new Error(String(error)));
       return await operation();
     }
   }
@@ -304,7 +250,8 @@ export class CodexBroker extends EventEmitter {
         } catch (reconnectError) {
           logger.warn("Reconnect to existing Codex app-server failed; restarting process", {
             reason: error.message,
-            reconnectError: getErrorMessage(reconnectError)
+            reconnectError:
+              reconnectError instanceof Error ? reconnectError.message : String(reconnectError)
           });
           await this.#queueConnectClient({
             restartProcess: true,
@@ -373,16 +320,20 @@ export class CodexBroker extends EventEmitter {
       await previousClient.close();
     } catch (error) {
       logger.warn("Failed to close previous Codex app-server client during reconnect", {
-        error: getErrorMessage(error)
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   }
 }
 
-function normalizeNotificationParams(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return value as Record<string, unknown>;
+function isRecoverableCodexConnectionError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return [
+    "Codex app-server websocket is not connected",
+    "WebSocket is not open",
+    "readyState 3",
+    "socket hang up",
+    "ECONNREFUSED",
+    "closed"
+  ].some((pattern) => message.includes(pattern));
 }

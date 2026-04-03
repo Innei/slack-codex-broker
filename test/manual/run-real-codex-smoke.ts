@@ -8,6 +8,7 @@ async function main(): Promise<void> {
   const codexHome = path.join(process.cwd(), ".tmp", `codex-smoke-${Date.now()}`);
   await fs.mkdir(codexHome, { recursive: true });
   const processManager = new AppServerProcess({
+    brokerHttpBaseUrl: "http://127.0.0.1:3300",
     codexHome,
     port: 4599,
     authJsonPath: process.env.CODEX_AUTH_JSON_PATH?.trim() || path.join(process.env.HOME || "", ".codex", "auth.json")

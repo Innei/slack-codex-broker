@@ -144,7 +144,7 @@ describe("AppServerClient disconnect handling", () => {
     await expect(started.completion).rejects.toThrow(/closed/i);
   });
 
-  it("buffers turn completion notifications that arrive immediately after turn/start", async () => {
+  it("buffers turn events that arrive before startTurn finishes registering the turn", async () => {
     const server = await createServer((socket, message) => {
       if (message.method === "initialize") {
         socket.send(JSON.stringify({
@@ -161,6 +161,13 @@ describe("AppServerClient disconnect handling", () => {
             turn: {
               id: "turn-1"
             }
+          }
+        }));
+        socket.send(JSON.stringify({
+          method: "item/agentMessage/delta",
+          params: {
+            turnId: "turn-1",
+            delta: "done"
           }
         }));
         socket.send(JSON.stringify({
@@ -194,7 +201,7 @@ describe("AppServerClient disconnect handling", () => {
     await expect(started.completion).resolves.toEqual({
       threadId: "thread-1",
       turnId: "turn-1",
-      finalMessage: "",
+      finalMessage: "done",
       aborted: false
     });
   });
@@ -794,6 +801,12 @@ describe("AppServerClient disconnect handling", () => {
       expect.stringContaining("BROKER_JOB_HELPER")
     );
     expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("Write normal Markdown in the `text` field")
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("the broker converts markdownish output to `mrkdwn` before posting")
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
       expect.stringContaining("The main Codex runtime for this Slack broker does not load the linear or notion MCPs directly")
     );
     expect(threadStartParams?.baseInstructions).toEqual(
@@ -864,6 +877,15 @@ describe("AppServerClient disconnect handling", () => {
     );
     expect(threadStartParams?.baseInstructions).toEqual(
       expect.stringContaining("shared_repos_root: /tmp/repos")
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("Git commit co-author contract")
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("Do not bypass git hooks")
+    );
+    expect(threadStartParams?.baseInstructions).toEqual(
+      expect.stringContaining("The broker may append `Co-authored-by:` trailers automatically")
     );
     expect(String(threadStartParams?.baseInstructions)).toContain("node \\\"$BROKER_JOB_HELPER\\\" event");
     expect(threadStartParams?.baseInstructions).toEqual(

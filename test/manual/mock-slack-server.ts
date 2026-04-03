@@ -34,6 +34,20 @@ export interface StreamRequest {
   readonly taskDisplayMode?: string | undefined;
 }
 
+export interface AssistantStatusUpdate {
+  readonly channel: string;
+  readonly threadTs: string;
+  readonly status: string;
+  readonly loadingMessages?: string | undefined;
+}
+
+export interface ReactionOperation {
+  readonly action: "add" | "remove";
+  readonly channel: string;
+  readonly timestamp: string;
+  readonly name: string;
+}
+
 export interface MockThreadMessage {
   readonly channel: string;
   readonly threadTs: string;
@@ -59,6 +73,9 @@ export class MockSlackServer {
   readonly addedReactions: AddedReaction[] = [];
   readonly assistantThreadStatuses: AssistantThreadStatusUpdate[] = [];
   readonly streamRequests: StreamRequest[] = [];
+  readonly assistantStatusUpdates: AssistantStatusUpdate[] = [];
+  readonly reactionOperations: ReactionOperation[] = [];
+  readonly #activeReactions = new Set<string>();
   readonly #users = new Map<string, {
     readonly id: string;
     readonly name: string;
@@ -101,6 +118,7 @@ export class MockSlackServer {
       readonly botId?: string;
       readonly appId?: string;
       readonly reactionError?: string;
+      readonly assistantStatusError?: string;
     }
   ) {
     this.#server = http.createServer((request, response) => {
@@ -288,13 +306,52 @@ export class MockSlackServer {
       return;
     }
 
+    if (request.url === "/api/assistant.threads.setStatus") {
+      if (this.options?.assistantStatusError) {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(
+          JSON.stringify({
+            ok: false,
+            error: this.options.assistantStatusError
+          })
+        );
+        return;
+      }
+
+      this.assistantThreadStatuses.push({
+        channelId: String(body.channel_id),
+        threadTs: String(body.thread_ts),
+        status: String(body.status ?? ""),
+        loadingMessages: readJsonStringArray(body.loading_messages)
+      });
+      this.assistantStatusUpdates.push({
+        channel: String(body.channel_id),
+        threadTs: String(body.thread_ts),
+        status: String(body.status ?? ""),
+        loadingMessages:
+          typeof body.loading_messages === "string" && body.loading_messages.length > 0
+            ? body.loading_messages
+            : undefined
+      });
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ ok: true }));
+      return;
+    }
+
     if (request.url === "/api/reactions.add") {
       const reaction: AddedReaction = {
         channel: String(body.channel),
         messageTs: String(body.timestamp),
         name: String(body.name)
       };
+      const reactionKey = getReactionKey(reaction.channel, reaction.messageTs, reaction.name);
       this.reactionRequests.push(reaction);
+      this.reactionOperations.push({
+        action: "add",
+        channel: reaction.channel,
+        timestamp: reaction.messageTs,
+        name: reaction.name
+      });
 
       response.writeHead(200, { "content-type": "application/json" });
       if (this.options?.reactionError) {
@@ -308,11 +365,31 @@ export class MockSlackServer {
       }
 
       this.addedReactions.push(reaction);
+      this.#activeReactions.add(reactionKey);
       response.end(
         JSON.stringify({
           ok: true
         })
       );
+      return;
+    }
+
+    if (request.url === "/api/reactions.remove") {
+      const reactionKey = getReactionKey(
+        String(body.channel),
+        String(body.timestamp),
+        String(body.name)
+      );
+      this.reactionOperations.push({
+        action: "remove",
+        channel: String(body.channel),
+        timestamp: String(body.timestamp),
+        name: String(body.name)
+      });
+      this.#activeReactions.delete(reactionKey);
+
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ ok: true }));
       return;
     }
 
@@ -341,18 +418,6 @@ export class MockSlackServer {
           messages
         })
       );
-      return;
-    }
-
-    if (request.url === "/api/assistant.threads.setStatus") {
-      this.assistantThreadStatuses.push({
-        channelId: String(body.channel_id),
-        threadTs: String(body.thread_ts),
-        status: String(body.status ?? ""),
-        loadingMessages: readJsonStringArray(body.loading_messages)
-      });
-      response.writeHead(200, { "content-type": "application/json" });
-      response.end(JSON.stringify({ ok: true }));
       return;
     }
 
@@ -482,4 +547,8 @@ function readJsonStringArray(value: unknown): readonly string[] | undefined {
   } catch {
     return undefined;
   }
+}
+
+function getReactionKey(channel: string, timestamp: string, name: string): string {
+  return `${channel}:${timestamp}:${name}`;
 }

@@ -18,6 +18,7 @@ import {
   SlackApi,
   type SlackUploadedFile
 } from "./slack-api.js";
+import { SlackAssistantStatusController } from "./slack-assistant-status.js";
 import {
   createSlackInputFromThreadMessage,
   isSlackMessageEffectivelyEmpty,
@@ -41,16 +42,13 @@ import {
   shouldNotifySlackFailure,
   shouldAutoRecoverSession
 } from "./slack-conversation-utils.js";
-import {
-  buildErrorContext,
-  buildWorkspaceContext
-} from "./slack-context-builder.js";
 import { SlackInboundStore } from "./slack-inbound-store.js";
 import {
   formatSlackHistoryContextForCodex
 } from "./slack-message-format.js";
+import { markdownishToMrkdwn } from "./slack-mrkdwn.js";
 import { SlackSelfMessageFilter } from "./slack-self-filter.js";
-import { SlackTurnPresence } from "./slack-turn-presence.js";
+import { SlackCoauthorService } from "./slack-coauthor-service.js";
 import { SlackTurnReconciler } from "./slack-turn-reconciler.js";
 import { SlackTurnRunner } from "./slack-turn-runner.js";
 
@@ -77,15 +75,22 @@ const INBOUND_ACK_REACTION = "eyes";
 export class SlackConversationService {
   readonly #config: AppConfig;
   readonly #sessions: SessionManager;
+  readonly #codex: CodexBroker;
   readonly #slackApi: SlackApi;
-  readonly #turnPresence: SlackTurnPresence;
   readonly #selfMessageFilter: SlackSelfMessageFilter;
+  readonly #coauthors: {
+    readonly noteIncomingSlackInput: (
+      session: SlackSessionRecord,
+      item: SlackInputMessage
+    ) => Promise<SlackSessionRecord>;
+  };
   readonly #runtimeSessions = new Map<string, RuntimeSessionState>();
+  readonly #statusControllers = new Map<string, SlackAssistantStatusController>();
   readonly #inboundStore: SlackInboundStore;
   readonly #turnRunner: SlackTurnRunner;
   readonly #turnReconciler: SlackTurnReconciler;
+  readonly #codexNotificationHandler: (method: string, params: Record<string, unknown> | undefined) => void;
   #botUserId = "";
-  #slackTeamId: string | undefined;
   #activeTurnReconcileTimer: NodeJS.Timeout | undefined;
   #catchUpPromise: Promise<void> | undefined;
   #lastMissedThreadRecoveryAtMs = 0;
@@ -97,15 +102,16 @@ export class SlackConversationService {
     readonly codex: CodexBroker;
     readonly slackApi: SlackApi;
     readonly selfMessageFilter: SlackSelfMessageFilter;
+    readonly coauthors?: SlackCoauthorService | undefined;
   }) {
     this.#config = options.config;
     this.#sessions = options.sessions;
+    this.#codex = options.codex;
     this.#slackApi = options.slackApi;
     this.#selfMessageFilter = options.selfMessageFilter;
-    this.#turnPresence = new SlackTurnPresence({
-      sessions: this.#sessions,
-      slackApi: this.#slackApi
-    });
+    this.#coauthors = options.coauthors ?? {
+      noteIncomingSlackInput: async (session) => session
+    };
     this.#inboundStore = new SlackInboundStore({
       sessions: this.#sessions,
       slackApi: this.#slackApi
@@ -121,35 +127,14 @@ export class SlackConversationService {
       turnRunner: this.#turnRunner,
       inboundStore: this.#inboundStore
     });
-    options.codex.on("turn_delta", (payload: { turnId: string; delta?: string; text?: string }) => {
-      void this.#turnPresence.noteTurnDelta(payload.turnId, payload.delta, payload.text);
-    });
-    options.codex.on("tool_use", (payload: {
-      turnId: string;
-      toolName: string;
-      params?: Record<string, unknown>;
-    }) => {
-      void this.#turnPresence.noteToolUse(payload.turnId, payload.toolName, payload.params);
-    });
-    options.codex.on("command_execution", (payload: {
-      turnId: string;
-      itemId: string;
-      phase: "started" | "completed";
-      command: string;
-      cwd?: string | undefined;
-      durationMs?: number | null | undefined;
-      exitCode?: number | null | undefined;
-    }) => {
-      void this.#turnPresence.noteCommandExecution(payload);
-    });
+    this.#codexNotificationHandler = (method: string, params: Record<string, unknown> | undefined) => {
+      this.#handleCodexNotification(method, params ?? {});
+    };
+    this.#codex.on("notification", this.#codexNotificationHandler);
   }
 
   setBotUserId(botUserId: string): void {
     this.#botUserId = botUserId;
-  }
-
-  setSlackTeamId(teamId: string | undefined): void {
-    this.#slackTeamId = teamId?.trim() || undefined;
   }
 
   async start(): Promise<void> {
@@ -161,7 +146,7 @@ export class SlackConversationService {
 
   async stop(): Promise<void> {
     this.#stopActiveTurnReconciler();
-    await this.#turnPresence.stop();
+    this.#codex.off("notification", this.#codexNotificationHandler);
     for (const runtime of this.#runtimeSessions.values()) {
       if (!runtime.autoResumeTimer) {
         continue;
@@ -169,6 +154,9 @@ export class SlackConversationService {
       clearTimeout(runtime.autoResumeTimer);
       runtime.autoResumeTimer = undefined;
     }
+    const stopPromises = [...this.#statusControllers.values()].map((controller) => controller.stop());
+    this.#statusControllers.clear();
+    await Promise.all(stopPromises);
   }
 
   isAlreadyHandled(session: SlackSessionRecord, messageTs?: string | undefined): boolean {
@@ -380,9 +368,11 @@ export class SlackConversationService {
     readonly reason?: string | undefined;
     readonly contextText?: string | undefined;
   }): Promise<void> {
-    const chunks = chunkSlackMessage(options.text);
+    const formattedText = markdownishToMrkdwn(options.text);
+    const chunks = chunkSlackMessage(formattedText);
     for (const [index, chunk] of chunks.entries()) {
       await this.#postBotThreadMessage(options.channelId, options.rootThreadTs, chunk, {
+        alreadyFormatted: true,
         turnSignal:
           index === 0 && options.kind
             ? {
@@ -390,18 +380,7 @@ export class SlackConversationService {
                 reason: options.reason
               }
             : undefined,
-        // Only add contextText to the last chunk
         contextText: index === chunks.length - 1 ? options.contextText : undefined
-      });
-    }
-
-    const session = this.#sessions.getSession(options.channelId, options.rootThreadTs);
-    if (session) {
-      await this.#turnPresence.noteSlackMessage({
-        session,
-        kind: options.kind,
-        text: options.text,
-        reason: options.reason
       });
     }
   }
@@ -423,11 +402,7 @@ export class SlackConversationService {
       reason: options.reason,
       occurredAt: new Date().toISOString()
     });
-    await this.#turnPresence.noteSlackMessage({
-      session,
-      kind: options.kind,
-      reason: options.reason
-    });
+    this.#clearAssistantStatus(options.channelId, options.rootThreadTs);
   }
 
   async postSlackFile(options: {
@@ -471,13 +446,16 @@ export class SlackConversationService {
       throw new Error("Unable to determine filename for Slack upload");
     }
 
+    this.#clearAssistantStatus(options.channelId, options.rootThreadTs);
     const uploaded = await this.#slackApi.uploadThreadFile({
       channelId: options.channelId,
       threadTs: options.rootThreadTs,
       filename,
       bytes,
       title: options.title?.trim() || undefined,
-      initialComment: options.initialComment?.trim() || undefined,
+      initialComment: options.initialComment
+        ? markdownishToMrkdwn(options.initialComment.trim())
+        : undefined,
       altText: options.altText?.trim() || undefined,
       snippetType: options.snippetType?.trim() || undefined,
       contentType: options.contentType?.trim() || undefined
@@ -576,7 +554,7 @@ export class SlackConversationService {
     await this.#turnRunner.interrupt(session);
     await this.#inboundStore.markTurnBatchDone(session, session.activeTurnId);
     await this.#sessions.setActiveTurnId(session.channelId, session.rootThreadTs, undefined);
-    await this.#turnPresence.clearSession(session);
+    this.#clearAssistantStatus(session.channelId, session.rootThreadTs);
     return true;
   }
 
@@ -592,7 +570,9 @@ export class SlackConversationService {
 
     this.#clearDispatchFailureBlock(session.key);
     await this.#acknowledgeInboundMessage(session, item);
-    const recordedSession = await this.#inboundStore.recordInboundMessage(session, item);
+    const coauthoredSession = await this.#coauthors.noteIncomingSlackInput(session, item);
+    const recordedSession = await this.#inboundStore.recordInboundMessage(coauthoredSession, item);
+    this.#setAssistantThinking(recordedSession);
     await this.#dispatchPersistedMessage(recordedSession, item.messageTs);
   }
 
@@ -611,15 +591,17 @@ export class SlackConversationService {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("missing_scope")) {
         this.#inboundAckReactionDisabled = true;
-        logger.info("Disabling inbound Slack reaction acknowledgements until reactions:write is granted", {
-          sessionKey: session.key,
+        logger.warn("Disabling inbound reaction acknowledgements after missing scope", {
+          channelId: session.channelId,
+          rootThreadTs: session.rootThreadTs,
           reaction: INBOUND_ACK_REACTION
         });
         return;
       }
 
-      logger.warn("Failed to add inbound Slack acknowledgement reaction", {
-        sessionKey: session.key,
+      logger.warn("Failed to acknowledge Slack inbound message", {
+        channelId: session.channelId,
+        rootThreadTs: session.rootThreadTs,
         messageTs: item.messageTs,
         reaction: INBOUND_ACK_REACTION,
         error: message
@@ -685,7 +667,6 @@ export class SlackConversationService {
       try {
         const outcome = await this.#reconcileSingleActiveTurn(session);
         if (outcome === "retained") {
-          await this.#turnPresence.refreshSession(this.#findSessionByKey(session.key));
           await this.#maybeRemindSilentActiveTurn(this.#findSessionByKey(session.key));
         }
       } catch (error) {
@@ -708,8 +689,9 @@ export class SlackConversationService {
     const outcome = await this.#turnReconciler.reconcileSingleActiveTurn(session);
 
     if (outcome === "cleared") {
-      await this.#turnPresence.clearSession(session);
       this.#resetRuntimeProcessing(session.key);
+      const latestSession = this.#findSessionByKey(session.key);
+      this.#clearAssistantStatus(latestSession.channelId, latestSession.rootThreadTs);
       await this.#resumePendingDispatch(session.key);
     }
 
@@ -786,6 +768,7 @@ export class SlackConversationService {
     rootThreadTs: string,
     text: string,
     options?: {
+      readonly alreadyFormatted?: boolean | undefined;
       readonly turnSignal?: {
         readonly kind: SlackTurnSignalKind;
         readonly reason?: string | undefined;
@@ -793,7 +776,9 @@ export class SlackConversationService {
       readonly contextText?: string | undefined;
     }
   ): Promise<string | undefined> {
-    const ts = await this.#slackApi.postThreadMessage(channelId, rootThreadTs, text, {
+    this.#clearAssistantStatus(channelId, rootThreadTs);
+    const formattedText = options?.alreadyFormatted ? text : markdownishToMrkdwn(text);
+    const ts = await this.#slackApi.postThreadMessage(channelId, rootThreadTs, formattedText, {
       contextText: options?.contextText
     });
     if (ts) {
@@ -876,6 +861,7 @@ export class SlackConversationService {
       return;
     }
 
+    this.#setAssistantThinking(latestSession);
     if (latestSession.activeTurnId) {
       try {
         const input = this.#inboundStore.createSlackInputFromPersistedMessage(pendingMessage);
@@ -918,6 +904,7 @@ export class SlackConversationService {
       return 0;
     }
 
+    this.#setAssistantThinking(latestSession);
     if (latestSession.activeTurnId) {
       try {
         const input = await this.#inboundStore.createRecoveredBatchInput(latestSession, pendingMessages, recoveryKind);
@@ -1122,6 +1109,7 @@ export class SlackConversationService {
           break;
         }
 
+        this.#setAssistantThinking(session);
         session = await this.#turnRunner.ensureCodexThread(session);
         const pendingMessages = this.#inboundStore.listPendingMessages(session);
 
@@ -1144,15 +1132,7 @@ export class SlackConversationService {
           sessionKey,
           senderUserId: slackInput.userId,
           input,
-          messageTsList: dispatchMessages.map((message) => message.messageTs),
-          onTurnStarted: async ({ session: startedSession, turnId }) => {
-            await this.#turnPresence.beginTurn({
-              session: startedSession,
-              turnId,
-              recipientUserId: this.#resolvePresenceRecipientUserId(slackInput),
-              recipientTeamId: this.#slackTeamId
-            });
-          }
+          messageTsList: dispatchMessages.map((message) => message.messageTs)
         });
 
         if (runtime.generation !== generation) {
@@ -1161,11 +1141,6 @@ export class SlackConversationService {
 
         session = turnOutcome.session;
         const result = turnOutcome.result;
-        await this.#turnPresence.noteTurnResult({
-          session,
-          turnId: result.turnId,
-          aborted: result.aborted
-        });
         logger.debug("Codex turn finished without broker-managed Slack reply forwarding", {
           sessionKey,
           turnId: result.turnId,
@@ -1175,6 +1150,7 @@ export class SlackConversationService {
         session = await this.#handleCompletedTurnDisposition(session, result.turnId, dispatchMessages, {
           aborted: result.aborted
         });
+        this.#maybeClearAssistantStatusIfIdle(session);
       } catch (error) {
         if (runtime.generation !== generation) {
           return;
@@ -1186,10 +1162,6 @@ export class SlackConversationService {
           rootThreadTs: session.rootThreadTs,
           error: error instanceof Error ? error.message : String(error)
         });
-        await this.#turnPresence.failSession(
-          session,
-          error instanceof Error ? error.message : String(error)
-        );
         const nowMs = Date.now();
         if (shouldNotifySlackFailure({
           previousFingerprint: runtime.lastFailureNotificationFingerprint,
@@ -1198,14 +1170,10 @@ export class SlackConversationService {
           nowMs
         })) {
           if (shouldPostSlackRunFailure(error)) {
-            const errorContext = session.activeTurnId
-              ? buildErrorContext({ sessionKey: session.key, turnId: session.activeTurnId })
-              : buildErrorContext({ sessionKey: session.key });
             await this.#postBotThreadMessage(
               session.channelId,
               session.rootThreadTs,
-              formatSlackRunFailureMessage(error),
-              { contextText: errorContext }
+              formatSlackRunFailureMessage(error)
             );
             runtime.lastFailureNotificationFingerprint = createSlackFailureFingerprint(error);
             runtime.lastFailureNotificationAtMs = nowMs;
@@ -1237,6 +1205,7 @@ export class SlackConversationService {
             error: error instanceof Error ? error.message : String(error)
           });
         }
+        this.#clearAssistantStatus(session.channelId, session.rootThreadTs);
         break;
       }
     }
@@ -1327,6 +1296,7 @@ export class SlackConversationService {
       this.#resetRuntimeProcessing(sessionKey);
     }
 
+    this.#setAssistantThinking(session);
     this.#enqueueDispatch(session, {
       kind: "dispatch_pending"
     });
@@ -1434,13 +1404,144 @@ export class SlackConversationService {
     return Date.now() - this.#lastMissedThreadRecoveryAtMs >= intervalMs;
   }
 
-  #resolvePresenceRecipientUserId(input: SlackInputMessage): string | undefined {
-    if (input.senderKind === "user" && !input.userId.startsWith("bot:") && !input.userId.startsWith("app:")) {
-      return input.userId;
+  #setAssistantThinking(session: SlackSessionRecord): void {
+    this.#getStatusController(session.channelId, session.rootThreadTs).setThinking();
+  }
+
+  #clearAssistantStatus(channelId: string, rootThreadTs: string): void {
+    const sessionKey = SessionManager.createKey(channelId, rootThreadTs);
+    this.#statusControllers.get(sessionKey)?.clear();
+  }
+
+  #maybeClearAssistantStatusIfIdle(session: SlackSessionRecord): void {
+    if (session.activeTurnId) {
+      return;
     }
 
-    return [...(input.batchMessages ?? [])]
-      .reverse()
-      .find((message) => message.sender?.userId)?.sender?.userId;
+    const hasPendingOrInflightMessages = this.#sessions.listInboundMessages({
+      channelId: session.channelId,
+      rootThreadTs: session.rootThreadTs,
+      status: ["pending", "inflight"]
+    }).length > 0;
+
+    if (hasPendingOrInflightMessages) {
+      return;
+    }
+
+    this.#clearAssistantStatus(session.channelId, session.rootThreadTs);
   }
+
+  #getStatusController(channelId: string, rootThreadTs: string): SlackAssistantStatusController {
+    const sessionKey = SessionManager.createKey(channelId, rootThreadTs);
+    let controller = this.#statusControllers.get(sessionKey);
+
+    if (!controller) {
+      controller = new SlackAssistantStatusController({
+        slackApi: this.#slackApi,
+        channelId,
+        threadTs: rootThreadTs
+      });
+      this.#statusControllers.set(sessionKey, controller);
+    }
+
+    return controller;
+  }
+
+  #handleCodexNotification(method: string, params: Record<string, unknown>): void {
+    const session = this.#findSessionForCodexNotification(params);
+    if (!session) {
+      return;
+    }
+
+    const controller = this.#getStatusController(session.channelId, session.rootThreadTs);
+
+    switch (method) {
+      case "assistant.state":
+      case "workspace.assistant.state":
+        controller.handleAssistantState(asRecord(params.state));
+        return;
+      case "tool_start":
+      case "codex/event/tool_start":
+        controller.handleToolStart(params);
+        return;
+      case "tool_end":
+      case "codex/event/tool_end":
+        controller.handleToolEnd(params);
+        return;
+      case "status":
+      case "codex/event/status":
+        controller.handleTerminalStatus(typeof params.status === "string" ? params.status : undefined);
+        return;
+      case "item/agentMessage/delta":
+      case "turn/completed":
+      case "codex/event/turn_aborted":
+      case "error":
+      case "codex/event/error":
+        controller.clear();
+        return;
+      default:
+        return;
+    }
+  }
+
+  #findSessionForCodexNotification(params: Record<string, unknown>): SlackSessionRecord | undefined {
+    const turnId = normalizeCodexTurnId(params);
+    const threadId = normalizeCodexThreadId(params);
+    if (!turnId && !threadId) {
+      return undefined;
+    }
+
+    const sessions = this.#sessions.listSessions();
+    for (const session of sessions) {
+      if (turnId && session.activeTurnId === turnId) {
+        return session;
+      }
+      if (threadId && session.codexThreadId === threadId) {
+        return session;
+      }
+    }
+
+    return undefined;
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function normalizeCodexTurnId(params: Record<string, unknown>): string | undefined {
+  const direct = normalizeNonEmptyString(
+    params.turnId ??
+      params.turn_id ??
+      (asRecord(params.turn)?.id) ??
+      (asRecord(params.msg)?.turn_id)
+  );
+  if (direct) {
+    return direct;
+  }
+
+  return normalizeNonEmptyString(asRecord(params.state)?.turn_id);
+}
+
+function normalizeCodexThreadId(params: Record<string, unknown>): string | undefined {
+  return normalizeNonEmptyString(
+    params.threadId ??
+      params.thread_id ??
+      (asRecord(params.thread)?.id) ??
+      (asRecord(params.msg)?.thread_id) ??
+      (asRecord(params.state)?.thread_id)
+  );
+}
+
+function normalizeNonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
