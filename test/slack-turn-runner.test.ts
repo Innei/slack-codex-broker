@@ -48,7 +48,10 @@ describe("SlackTurnRunner", () => {
         setActiveTurnId,
         setCodexThreadId
       } as any,
-      inboundStore: {} as any
+      inboundStore: {} as any,
+      memory: {
+        buildContextBlock: vi.fn()
+      } as any
     });
 
     const result = await runner.ensureCodexThread(currentSession);

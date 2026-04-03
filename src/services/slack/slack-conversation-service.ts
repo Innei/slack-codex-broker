@@ -14,6 +14,7 @@ import type {
   SlackTurnSignalKind
 } from "../../types.js";
 import { CodexBroker } from "../codex/codex-broker.js";
+import { WhiteBoxMemoryService } from "../memory/white-box-memory-service.js";
 import {
   SlackApi,
   type SlackUploadedFile
@@ -79,6 +80,7 @@ export class SlackConversationService {
   readonly #inboundStore: SlackInboundStore;
   readonly #turnRunner: SlackTurnRunner;
   readonly #turnReconciler: SlackTurnReconciler;
+  readonly #memory: WhiteBoxMemoryService;
   #botUserId = "";
   #slackTeamId: string | undefined;
   #activeTurnReconcileTimer: NodeJS.Timeout | undefined;
@@ -91,11 +93,13 @@ export class SlackConversationService {
     readonly codex: CodexBroker;
     readonly slackApi: SlackApi;
     readonly selfMessageFilter: SlackSelfMessageFilter;
+    readonly memory: WhiteBoxMemoryService;
   }) {
     this.#config = options.config;
     this.#sessions = options.sessions;
     this.#slackApi = options.slackApi;
     this.#selfMessageFilter = options.selfMessageFilter;
+    this.#memory = options.memory;
     this.#turnPresence = new SlackTurnPresence({
       sessions: this.#sessions,
       slackApi: this.#slackApi
@@ -108,7 +112,8 @@ export class SlackConversationService {
       codex: options.codex,
       slackApi: this.#slackApi,
       sessions: this.#sessions,
-      inboundStore: this.#inboundStore
+      inboundStore: this.#inboundStore,
+      memory: options.memory
     });
     this.#turnReconciler = new SlackTurnReconciler({
       sessions: this.#sessions,
@@ -1076,7 +1081,7 @@ export class SlackConversationService {
           continue;
         }
 
-        const input = await this.#turnRunner.buildTurnInput(slackInput);
+        const input = await this.#turnRunner.buildTurnInput(session, slackInput);
         const turnOutcome = await this.#turnRunner.runTurnWithRecovery({
           session,
           sessionKey,
@@ -1110,6 +1115,25 @@ export class SlackConversationService {
           aborted: result.aborted,
           hadFinalMessage: Boolean(result.finalMessage)
         });
+        try {
+          const latestSession = this.#sessions.getSession(session.channelId, session.rootThreadTs) ?? session;
+          await this.#memory.captureTurn({
+            session: latestSession,
+            messages: dispatchMessages,
+            turnId: result.turnId,
+            assistantMessage: result.finalMessage,
+            turnSignalKind:
+              latestSession.lastTurnSignalTurnId === result.turnId
+                ? latestSession.lastTurnSignalKind
+                : undefined
+          });
+        } catch (error) {
+          logger.warn("Failed to update white-box memory after Slack turn", {
+            sessionKey,
+            turnId: result.turnId,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
         session = await this.#handleCompletedTurnDisposition(session, result.turnId, dispatchMessages, {
           aborted: result.aborted
         });

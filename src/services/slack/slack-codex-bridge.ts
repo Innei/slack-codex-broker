@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import type { AppConfig } from "../../config.js";
 import { logger } from "../../logger.js";
 import type {
@@ -7,6 +9,7 @@ import type {
   SlackUserIdentity
 } from "../../types.js";
 import { CodexBroker } from "../codex/codex-broker.js";
+import { WhiteBoxMemoryService } from "../memory/white-box-memory-service.js";
 import { SessionManager } from "../session-manager.js";
 import {
   type ParsedSlackEvent,
@@ -26,6 +29,7 @@ export class SlackCodexBridge {
   readonly #slackSocket: SlackSocketModeClient;
   readonly #selfMessageFilter = new SlackSelfMessageFilter();
   readonly #conversations: SlackConversationService;
+  readonly #memory: WhiteBoxMemoryService;
   #botUserId = "";
   #botIdentity: SlackUserIdentity | null = null;
 
@@ -46,12 +50,16 @@ export class SlackCodexBridge {
       api: this.#slackApi,
       socketOpenPath: this.#config.slackSocketOpenUrl
     });
+    this.#memory = new WhiteBoxMemoryService({
+      rootDir: path.join(path.dirname(this.#config.stateDir), "memory")
+    });
     this.#conversations = new SlackConversationService({
       config: this.#config,
       sessions: this.#sessions,
       codex: this.#codex,
       slackApi: this.#slackApi,
-      selfMessageFilter: this.#selfMessageFilter
+      selfMessageFilter: this.#selfMessageFilter,
+      memory: this.#memory
     });
   }
 

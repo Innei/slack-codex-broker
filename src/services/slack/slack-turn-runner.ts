@@ -6,6 +6,7 @@ import type {
   SlackInputMessage,
   SlackSessionRecord
 } from "../../types.js";
+import { WhiteBoxMemoryService } from "../memory/white-box-memory-service.js";
 import { SessionManager } from "../session-manager.js";
 import { SlackApi } from "./slack-api.js";
 import { formatSlackMessageForCodex } from "./slack-message-format.js";
@@ -20,17 +21,20 @@ export class SlackTurnRunner {
   readonly #slackApi: SlackApi;
   readonly #sessions: SessionManager;
   readonly #inboundStore: SlackInboundStore;
+  readonly #memory: WhiteBoxMemoryService;
 
   constructor(options: {
     readonly codex: CodexBroker;
     readonly slackApi: SlackApi;
     readonly sessions: SessionManager;
     readonly inboundStore: SlackInboundStore;
+    readonly memory: WhiteBoxMemoryService;
   }) {
     this.#codex = options.codex;
     this.#slackApi = options.slackApi;
     this.#sessions = options.sessions;
     this.#inboundStore = options.inboundStore;
+    this.#memory = options.memory;
   }
 
   async steerActiveTurn(session: SlackSessionRecord, item: SlackInputMessage): Promise<void> {
@@ -38,7 +42,7 @@ export class SlackTurnRunner {
     const sender = enrichedItem.source !== "background_job_event" && enrichedItem.source !== "recovered_thread_batch" && enrichedItem.senderKind === "user"
       ? await this.#slackApi.getUserIdentity(enrichedItem.userId)
       : null;
-    const formattedMessage = formatSlackMessageForCodex(enrichedItem, sender);
+    const formattedMessage = await this.#buildMessageWithMemory(session, enrichedItem, sender);
     const imageItems = await this.#buildImageInputItems(enrichedItem);
     await this.#codex.steer(
       session,
@@ -58,12 +62,12 @@ export class SlackTurnRunner {
     );
   }
 
-  async buildTurnInput(message: SlackInputMessage): Promise<readonly CodexInputItem[]> {
+  async buildTurnInput(session: SlackSessionRecord, message: SlackInputMessage): Promise<readonly CodexInputItem[]> {
     const enrichedMessage = await this.#enrichMentionedUsers(message);
     const sender = enrichedMessage.source !== "background_job_event" && enrichedMessage.source !== "recovered_thread_batch" && enrichedMessage.senderKind === "user"
       ? await this.#slackApi.getUserIdentity(enrichedMessage.userId)
       : null;
-    const inputText = formatSlackMessageForCodex(enrichedMessage, sender);
+    const inputText = await this.#buildMessageWithMemory(session, enrichedMessage, sender);
     const imageItems = await this.#buildImageInputItems(enrichedMessage);
     return [
       createTextInputItem(inputText),
@@ -73,6 +77,30 @@ export class SlackTurnRunner {
 
   async steerReminder(session: SlackSessionRecord, text: string): Promise<void> {
     await this.#codex.steer(session, [createTextInputItem(text)]);
+  }
+
+  async #buildMessageWithMemory(
+    session: SlackSessionRecord,
+    message: SlackInputMessage,
+    sender: Awaited<ReturnType<SlackApi["getUserIdentity"]>>
+  ): Promise<string> {
+    const inputText = formatSlackMessageForCodex(message, sender);
+    if (message.senderKind !== "user" || !message.userId) {
+      return inputText;
+    }
+
+    const memoryBlock = await this.#memory.buildContextBlock({
+      session,
+      userId: message.userId
+    });
+    if (!memoryBlock) {
+      return inputText;
+    }
+
+    return [
+      memoryBlock,
+      inputText
+    ].join("\n\n");
   }
 
   async runTurnWithRecovery(options: {
