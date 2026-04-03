@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -48,7 +49,7 @@ describe("WhiteBoxMemoryService", () => {
     expect(contextBlock).toContain("outputs: 已经接入了基础 task ledger 读写链路。");
 
     const sectionLedger = JSON.parse(
-      await fs.readFile(path.join(rootDir, "users", "U123", "sections", "C123-111.222.json"), "utf8")
+      await fs.readFile(sectionLedgerPath(rootDir, "U123", session.key), "utf8")
     ) as { tasks: Array<{ request: string; status: string }> };
     expect(sectionLedger.tasks[0]?.request).toBe("开始实现 slack codex 的跨 section 工作记忆");
     expect(sectionLedger.tasks[0]?.status).toBe("in_progress");
@@ -120,4 +121,21 @@ function createMessage(options: {
     createdAt: "2026-04-03T00:00:00.000Z",
     updatedAt: "2026-04-03T00:00:00.000Z"
   };
+}
+
+function sectionLedgerPath(rootDir: string, userId: string, sectionKey: string): string {
+  return path.join(
+    rootDir,
+    "users",
+    sanitizePathSegmentForTest(userId),
+    "sections",
+    `${sanitizePathSegmentForTest(sectionKey)}.json`
+  );
+}
+
+function sanitizePathSegmentForTest(value: string): string {
+  const normalized = value.normalize("NFKC");
+  const base = normalized.replace(/[^\p{L}\p{N}._-]+/gu, "-").replace(/^-+|-+$/gu, "") || "default";
+  const digest = createHash("sha1").update(value).digest("hex").slice(0, 8);
+  return `${base}--${digest}`;
 }

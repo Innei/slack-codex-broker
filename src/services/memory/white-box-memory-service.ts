@@ -1,7 +1,8 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { logger } from "../../logger.js";
 import type {
   PersistedInboundMessage,
   SlackSessionRecord,
@@ -60,6 +61,7 @@ interface UserWorkLedger {
 
 export class WhiteBoxMemoryService {
   readonly #rootDir: string;
+  readonly #writeChains = new Map<string, Promise<void>>();
 
   constructor(options: {
     readonly rootDir: string;
@@ -158,6 +160,7 @@ export class WhiteBoxMemoryService {
         : [];
 
     await Promise.all(targetUserIds.map(async (userId) => {
+      await this.#runSerialized(userId, async () => {
       const sectionPath = this.#sectionLedgerPath(userId, options.session);
       const currentLedger = await this.#readSectionLedger(sectionPath);
       let tasks = [...(currentLedger?.tasks ?? [])];
@@ -196,6 +199,7 @@ export class WhiteBoxMemoryService {
 
       await this.#writeSectionLedger(sectionPath, sectionLedger);
       await this.#writeUserLedger(userId, sectionLedger);
+      });
     }));
   }
 
@@ -292,6 +296,22 @@ export class WhiteBoxMemoryService {
 
   #sectionLedgerPath(userId: string, session: SlackSessionRecord): string {
     return path.join(this.#rootDir, "users", sanitizePathSegment(userId), "sections", `${sanitizePathSegment(session.key)}.json`);
+  }
+
+  async #runSerialized(key: string, operation: () => Promise<void>): Promise<void> {
+    const previous = this.#writeChains.get(key) ?? Promise.resolve();
+    const next = previous
+      .catch(() => {})
+      .then(operation);
+    this.#writeChains.set(key, next);
+
+    try {
+      await next;
+    } finally {
+      if (this.#writeChains.get(key) === next) {
+        this.#writeChains.delete(key);
+      }
+    }
   }
 }
 
@@ -477,7 +497,10 @@ function trimForContext(text: string, limit: number): string {
 }
 
 function sanitizePathSegment(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "default";
+  const normalized = value.normalize("NFKC");
+  const base = normalized.replace(/[^\p{L}\p{N}._-]+/gu, "-").replace(/^-+|-+$/gu, "") || "default";
+  const digest = createHash("sha1").update(value).digest("hex").slice(0, 8);
+  return `${base}--${digest}`;
 }
 
 function isLikelyAck(text: string): boolean {
@@ -493,12 +516,33 @@ async function readJsonFile(filePath: string): Promise<Record<string, unknown> |
     return null;
   }
 
-  const raw = await fs.readFile(filePath, "utf8").catch(() => "");
+  let raw: string;
+  try {
+    raw = await fs.readFile(filePath, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException | undefined)?.code !== "ENOENT") {
+      logger.warn("Failed to read work-memory file", {
+        filePath,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+    return null;
+  }
+
   if (!raw.trim()) {
     return null;
   }
 
-  const parsed = JSON.parse(raw) as unknown;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch (error) {
+    logger.warn("Failed to parse work-memory file", {
+      filePath,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    return null;
+  }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     return null;
   }
@@ -508,7 +552,9 @@ async function readJsonFile(filePath: string): Promise<Record<string, unknown> |
 
 async function writeJsonFile(filePath: string, value: unknown): Promise<void> {
   await ensureDir(path.dirname(filePath));
-  await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
+  const tempPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
+  await fs.writeFile(tempPath, `${JSON.stringify(value, null, 2)}\n`);
+  await fs.rename(tempPath, filePath);
 }
 
 function isWorkTask(value: unknown): value is WorkTask {

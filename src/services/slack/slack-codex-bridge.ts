@@ -51,7 +51,7 @@ export class SlackCodexBridge {
       socketOpenPath: this.#config.slackSocketOpenUrl
     });
     this.#memory = new WhiteBoxMemoryService({
-      rootDir: path.join(path.dirname(this.#config.stateDir), "memory")
+      rootDir: path.join(this.#config.stateDir, "memory")
     });
     this.#conversations = new SlackConversationService({
       config: this.#config,
