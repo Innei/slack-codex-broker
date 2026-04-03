@@ -79,9 +79,18 @@ export class SlackCodexBridge {
 
     await this.#conversations.start();
 
-    this.#slackSocket.on("ready", this.#boundHandlers.onReady);
-    this.#slackSocket.on("events_api", this.#boundHandlers.onEventsApi);
-    this.#slackSocket.on("interactive", this.#boundHandlers.onInteractive);
+    this.#slackSocket.on("ready", () => {
+      void this.#conversations.recoverMissedThreadMessages("socket_ready");
+    });
+    this.#slackSocket.on("events_api", (payload) => {
+      void this.#handleEventsApi(payload as {
+        readonly event?: Record<string, any>;
+        readonly event_id?: string;
+      });
+    });
+    this.#slackSocket.on("interactive", (payload) => {
+      void this.#handleInteractive(payload as Record<string, unknown>);
+    });
 
     await this.#slackSocket.start();
   }
