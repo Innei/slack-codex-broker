@@ -24,6 +24,8 @@ describe("admin routes", () => {
     const adminService = {
       getStatus: async () => ({ ok: true, status: "admin-ok" }),
       addAuthProfile: async () => ({ ok: true }),
+      upsertGitHubAuthorMapping: async () => ({ ok: true }),
+      deleteGitHubAuthorMapping: async () => ({ ok: true }),
       deleteAuthProfile: async () => ({ ok: true }),
       activateAuthProfile: async () => ({ ok: true }),
       deployWorker: async () => ({ ok: true }),
@@ -81,6 +83,8 @@ describe("admin routes", () => {
     const adminService = {
       getStatus: async () => ({ ok: true, status: "admin-ok" }),
       addAuthProfile: async () => ({ ok: true }),
+      upsertGitHubAuthorMapping: async () => ({ ok: true }),
+      deleteGitHubAuthorMapping: async () => ({ ok: true }),
       deleteAuthProfile: async () => ({ ok: true }),
       activateAuthProfile: async () => ({ ok: true }),
       deployWorker: async () => ({ ok: true }),
@@ -121,6 +125,8 @@ describe("admin routes", () => {
     expect(html).toContain("open-add-profile-dialog");
     expect(html).toContain("auth-profiles-panel");
     expect(html).toContain("Auth Profiles");
+    expect(html).toContain("github-authors-panel");
+    expect(html).toContain("GitHub Authors");
     expect(html).toContain("Deploy");
     expect(html).toContain("deploy-release-button");
     expect(html).toContain("Runtime Info");
@@ -146,6 +152,8 @@ describe("admin routes", () => {
         calls.push(payload);
         return { ok: true, status: { ok: true } };
       },
+      upsertGitHubAuthorMapping: async () => ({ ok: true }),
+      deleteGitHubAuthorMapping: async () => ({ ok: true }),
       deleteAuthProfile: async () => ({ ok: true }),
       activateAuthProfile: async () => ({ ok: true }),
       deployWorker: async () => ({ ok: true }),
@@ -197,6 +205,72 @@ describe("admin routes", () => {
     ]);
   });
 
+  it("forwards GitHub author mapping upserts to the admin service", async () => {
+    const config = loadConfig({
+      SLACK_APP_TOKEN: "xapp-test",
+      SLACK_BOT_TOKEN: "xoxb-test"
+    } as NodeJS.ProcessEnv);
+    const calls: Array<Record<string, unknown>> = [];
+    const adminService = {
+      getStatus: async () => ({ ok: true }),
+      addAuthProfile: async () => ({ ok: true }),
+      upsertGitHubAuthorMapping: async (payload: Record<string, unknown>) => {
+        calls.push(payload);
+        return { ok: true, status: { ok: true } };
+      },
+      deleteGitHubAuthorMapping: async () => ({ ok: true }),
+      deleteAuthProfile: async () => ({ ok: true }),
+      activateAuthProfile: async () => ({ ok: true }),
+      deployWorker: async () => ({ ok: true }),
+      rollbackWorker: async () => ({ ok: true })
+    };
+
+    const server = http.createServer(
+      createHttpHandler({
+        adminService: adminService as never,
+        bridge: {} as never,
+        isolatedMcp: {} as never,
+        jobManager: {} as never,
+        config
+      })
+    );
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    cleanups.push(async () => {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      });
+    });
+
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("failed to start test server");
+    }
+
+    const response = await fetch(`http://127.0.0.1:${address.port}/admin/api/github-authors`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        slack_user_id: "U123",
+        github_author: "Alice Example <alice@example.com>"
+      })
+    });
+    expect(response.status).toBe(200);
+    expect(calls).toEqual([
+      {
+        slackUserId: "U123",
+        githubAuthor: "Alice Example <alice@example.com>"
+      }
+    ]);
+  });
+
   it("emits admin page inline script without syntax errors", async () => {
     const config = loadConfig({
       SLACK_APP_TOKEN: "xapp-test",
@@ -205,6 +279,8 @@ describe("admin routes", () => {
     const adminService = {
       getStatus: async () => ({ ok: true, status: "admin-ok" }),
       addAuthProfile: async () => ({ ok: true }),
+      upsertGitHubAuthorMapping: async () => ({ ok: true }),
+      deleteGitHubAuthorMapping: async () => ({ ok: true }),
       deleteAuthProfile: async () => ({ ok: true }),
       activateAuthProfile: async () => ({ ok: true }),
       deployWorker: async () => ({ ok: true }),
@@ -258,6 +334,8 @@ describe("admin routes", () => {
     const adminService = {
       getStatus: async () => ({ ok: true }),
       addAuthProfile: async () => ({ ok: true }),
+      upsertGitHubAuthorMapping: async () => ({ ok: true }),
+      deleteGitHubAuthorMapping: async () => ({ ok: true }),
       deleteAuthProfile: async () => ({ ok: true }),
       activateAuthProfile: async () => ({ ok: true }),
       deployWorker: async (payload: Record<string, unknown>) => {
@@ -319,6 +397,8 @@ describe("admin routes", () => {
     const adminService = {
       getStatus: async () => ({ ok: true }),
       addAuthProfile: async () => ({ ok: true }),
+      upsertGitHubAuthorMapping: async () => ({ ok: true }),
+      deleteGitHubAuthorMapping: async () => ({ ok: true }),
       deleteAuthProfile: async () => ({ ok: true }),
       activateAuthProfile: async () => ({ ok: true }),
       deployWorker: async () => ({ ok: true }),
