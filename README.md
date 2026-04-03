@@ -190,6 +190,43 @@ pnpm pm2:stop
 pnpm pm2:logs
 ```
 
+## Live Slack E2E Without Redeploy
+
+The repo now includes a live Slack E2E runner that targets an already deployed broker.
+It does **not** start another broker process and does **not** touch PM2. Instead it:
+
+1. uses a real Slack user token to post an `@mention` into a dedicated test channel
+2. waits for the deployed broker to handle that message
+3. polls the real Slack thread for the assistant reply
+4. writes the structured result to a local JSON artifact
+
+Required environment:
+
+```bash
+export SLACK_BOT_TOKEN=...
+export SLACK_E2E_TRIGGER_USER_TOKEN=...
+export SLACK_E2E_CHANNEL_ID=C0123456789
+```
+
+Use a channel where the deployed broker bot is already present and where the trigger user token can both post and read thread replies.
+
+Optional overrides:
+
+```bash
+export SLACK_E2E_TARGET_REPO=slack-codex-broker
+export SLACK_E2E_TARGET_FILE=src/services/slack/slack-codex-bridge.ts
+export SLACK_E2E_TIMEOUT_MS=180000
+export SLACK_E2E_RESULT_PATH=artifacts/slack-live-e2e/result.json
+```
+
+Run it with:
+
+```bash
+pnpm test:e2e:live
+```
+
+Passing output means the live Slack bot accepted a real mention, resolved the target repository, and produced the expected final reply marker in the real Slack thread.
+
 ### Important notes
 
 - Leave `CODEX_APP_SERVER_URL` unset in host mode unless you intentionally manage a separate external Codex app-server yourself.

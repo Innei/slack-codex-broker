@@ -39,6 +39,7 @@
     "start:worker": "node dist/src/worker-index.js",
     "test": "vitest run",
     "test:e2e:mock": "tsx test/manual/run-mock-e2e.ts",
+    "test:e2e:live": "tsx test/manual/run-live-slack-e2e.ts",
     "manual:test": "tsx test/manual/run-real-codex-smoke.ts"
   },
   "dependencies": {

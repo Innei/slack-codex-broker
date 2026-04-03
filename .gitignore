@@ -11,5 +11,6 @@ coverage/
 .tmp/
 logs/
 *.log
+artifacts/slack-live-e2e/
 
 .DS_Store
