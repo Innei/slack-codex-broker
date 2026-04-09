@@ -7,7 +7,6 @@ import type {
   SlackUserIdentity
 } from "../../types.js";
 import { CodexBroker } from "../codex/codex-broker.js";
-import { GitHubAuthorMappingService } from "../github-author-mapping-service.js";
 import { SessionManager } from "../session-manager.js";
 import {
   type ParsedSlackEvent,
@@ -15,7 +14,6 @@ import {
   parseSlackEvent
 } from "./slack-event-parser.js";
 import { SlackApi } from "./slack-api.js";
-import { SlackCoauthorService } from "./slack-coauthor-service.js";
 import { SlackConversationService } from "./slack-conversation-service.js";
 import { SlackSelfMessageFilter } from "./slack-self-filter.js";
 import { SlackSocketModeClient } from "./socket-mode-client.js";
@@ -27,7 +25,6 @@ export class SlackCodexBridge {
   readonly #slackApi: SlackApi;
   readonly #slackSocket: SlackSocketModeClient;
   readonly #selfMessageFilter = new SlackSelfMessageFilter();
-  readonly #coauthors: SlackCoauthorService;
   readonly #conversations: SlackConversationService;
   #botUserId = "";
   #botIdentity: SlackUserIdentity | null = null;
@@ -36,7 +33,6 @@ export class SlackCodexBridge {
     readonly config: AppConfig;
     readonly sessions: SessionManager;
     readonly codex: CodexBroker;
-    readonly mappings: GitHubAuthorMappingService;
   }) {
     this.#config = options.config;
     this.#sessions = options.sessions;
@@ -50,18 +46,12 @@ export class SlackCodexBridge {
       api: this.#slackApi,
       socketOpenPath: this.#config.slackSocketOpenUrl
     });
-    this.#coauthors = new SlackCoauthorService({
-      sessions: this.#sessions,
-      slackApi: this.#slackApi,
-      mappings: options.mappings
-    });
     this.#conversations = new SlackConversationService({
       config: this.#config,
       sessions: this.#sessions,
       codex: this.#codex,
       slackApi: this.#slackApi,
-      selfMessageFilter: this.#selfMessageFilter,
-      coauthors: this.#coauthors
+      selfMessageFilter: this.#selfMessageFilter
     });
   }
 
@@ -87,9 +77,6 @@ export class SlackCodexBridge {
         readonly event?: Record<string, any>;
         readonly event_id?: string;
       });
-    });
-    this.#slackSocket.on("interactive", (payload) => {
-      void this.#handleInteractive(payload as Record<string, unknown>);
     });
 
     await this.#slackSocket.start();
@@ -173,29 +160,6 @@ export class SlackCodexBridge {
     return await this.#conversations.postSlackFile(options);
   }
 
-  async listGitHubAuthorMappings() {
-    return await this.#coauthors.listMappings();
-  }
-
-  async upsertGitHubAuthorMapping(options: {
-    readonly slackUserId: string;
-    readonly githubAuthor: string;
-  }) {
-    return await this.#coauthors.upsertManualMapping(options);
-  }
-
-  async deleteGitHubAuthorMapping(slackUserId: string): Promise<void> {
-    await this.#coauthors.deleteMapping(slackUserId);
-  }
-
-  async resolveCommitCoauthors(options: {
-    readonly cwd: string;
-    readonly commitMessage: string;
-    readonly primaryAuthorEmail?: string | undefined;
-  }) {
-    return await this.#coauthors.resolveCommitCoauthors(options);
-  }
-
   async #handleEventsApi(payload: {
     readonly event?: Record<string, any>;
     readonly event_id?: string;
@@ -214,16 +178,6 @@ export class SlackCodexBridge {
     } catch (error) {
       logger.error("Failed to process Slack event", {
         eventId: payload.event_id,
-        error: error instanceof Error ? error.message : String(error)
-      });
-    }
-  }
-
-  async #handleInteractive(payload: Record<string, unknown>): Promise<void> {
-    try {
-      await this.#coauthors.handleInteractivePayload(payload);
-    } catch (error) {
-      logger.error("Failed to process Slack interactive payload", {
         error: error instanceof Error ? error.message : String(error)
       });
     }

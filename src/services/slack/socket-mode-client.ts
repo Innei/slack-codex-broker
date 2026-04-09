@@ -200,11 +200,6 @@ export class SlackSocketModeClient extends EventEmitter {
 
     if (envelope.type === "events_api" && envelope.payload) {
       this.emit("events_api", envelope.payload);
-      return;
-    }
-
-    if (envelope.type === "interactive" && envelope.payload) {
-      this.emit("interactive", envelope.payload);
     }
   }
 
@@ -235,7 +230,7 @@ function buildSlackEnvelopeMeta(envelope: SlackSocketEnvelope): Record<string, u
     envelopeId: envelope.envelope_id,
     envelopeType: envelope.type,
     eventId: envelope.payload?.event_id,
-    eventType: event?.type ?? envelope.payload?.type,
+    eventType: event?.type,
     channelId,
     rootThreadTs
   };

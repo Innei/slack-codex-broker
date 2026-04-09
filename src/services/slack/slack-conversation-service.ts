@@ -48,7 +48,6 @@ import {
 } from "./slack-message-format.js";
 import { markdownishToMrkdwn } from "./slack-mrkdwn.js";
 import { SlackSelfMessageFilter } from "./slack-self-filter.js";
-import { SlackCoauthorService } from "./slack-coauthor-service.js";
 import { SlackTurnReconciler } from "./slack-turn-reconciler.js";
 import { SlackTurnRunner } from "./slack-turn-runner.js";
 
@@ -78,12 +77,6 @@ export class SlackConversationService {
   readonly #codex: CodexBroker;
   readonly #slackApi: SlackApi;
   readonly #selfMessageFilter: SlackSelfMessageFilter;
-  readonly #coauthors: {
-    readonly noteIncomingSlackInput: (
-      session: SlackSessionRecord,
-      item: SlackInputMessage
-    ) => Promise<SlackSessionRecord>;
-  };
   readonly #runtimeSessions = new Map<string, RuntimeSessionState>();
   readonly #statusControllers = new Map<string, SlackAssistantStatusController>();
   readonly #inboundStore: SlackInboundStore;
@@ -102,16 +95,12 @@ export class SlackConversationService {
     readonly codex: CodexBroker;
     readonly slackApi: SlackApi;
     readonly selfMessageFilter: SlackSelfMessageFilter;
-    readonly coauthors?: SlackCoauthorService | undefined;
   }) {
     this.#config = options.config;
     this.#sessions = options.sessions;
     this.#codex = options.codex;
     this.#slackApi = options.slackApi;
     this.#selfMessageFilter = options.selfMessageFilter;
-    this.#coauthors = options.coauthors ?? {
-      noteIncomingSlackInput: async (session) => session
-    };
     this.#inboundStore = new SlackInboundStore({
       sessions: this.#sessions,
       slackApi: this.#slackApi
@@ -570,8 +559,7 @@ export class SlackConversationService {
 
     this.#clearDispatchFailureBlock(session.key);
     await this.#acknowledgeInboundMessage(session, item);
-    const coauthoredSession = await this.#coauthors.noteIncomingSlackInput(session, item);
-    const recordedSession = await this.#inboundStore.recordInboundMessage(coauthoredSession, item);
+    const recordedSession = await this.#inboundStore.recordInboundMessage(session, item);
     this.#setAssistantThinking(recordedSession);
     await this.#dispatchPersistedMessage(recordedSession, item.messageTs);
   }

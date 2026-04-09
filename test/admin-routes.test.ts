@@ -84,8 +84,6 @@ describe("admin routes", () => {
     } as NodeJS.ProcessEnv, {
       getStatus: async () => ({ ok: true, status: "admin-ok" }),
       addAuthProfile: async () => ({ ok: true }),
-      upsertGitHubAuthorMapping: async () => ({ ok: true }),
-      deleteGitHubAuthorMapping: async () => ({ ok: true }),
       deleteAuthProfile: async () => ({ ok: true }),
       activateAuthProfile: async () => ({ ok: true }),
       deployWorker: async () => ({ ok: true }),
@@ -99,8 +97,6 @@ describe("admin routes", () => {
     expect(html).toContain("open-add-profile-dialog");
     expect(html).toContain("auth-profiles-panel");
     expect(html).toContain("Auth Profiles");
-    expect(html).toContain("github-authors-panel");
-    expect(html).toContain("GitHub Authors");
     expect(html).toContain("Deploy");
     expect(html).toContain("deploy-release-button");
     expect(html).toContain("Runtime Info");
@@ -154,8 +150,6 @@ describe("admin routes", () => {
         calls.push(payload);
         return { ok: true, status: { ok: true } };
       },
-      upsertGitHubAuthorMapping: async () => ({ ok: true }),
-      deleteGitHubAuthorMapping: async () => ({ ok: true }),
       deleteAuthProfile: async () => ({ ok: true }),
       activateAuthProfile: async () => ({ ok: true }),
       deployWorker: async () => ({ ok: true }),
@@ -180,44 +174,6 @@ describe("admin routes", () => {
     ]);
   });
 
-  it("forwards GitHub author mapping upserts to the admin service", async () => {
-    const calls: Array<Record<string, unknown>> = [];
-    const baseUrl = await startAdminServer({
-      SLACK_APP_TOKEN: "xapp-test",
-      SLACK_BOT_TOKEN: "xoxb-test"
-    } as NodeJS.ProcessEnv, {
-      getStatus: async () => ({ ok: true }),
-      addAuthProfile: async () => ({ ok: true }),
-      upsertGitHubAuthorMapping: async (payload: Record<string, unknown>) => {
-        calls.push(payload);
-        return { ok: true, status: { ok: true } };
-      },
-      deleteGitHubAuthorMapping: async () => ({ ok: true }),
-      deleteAuthProfile: async () => ({ ok: true }),
-      activateAuthProfile: async () => ({ ok: true }),
-      deployWorker: async () => ({ ok: true }),
-      rollbackWorker: async () => ({ ok: true })
-    });
-
-    const response = await fetch(`${baseUrl}/admin/api/github-authors`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json"
-      },
-      body: JSON.stringify({
-        slack_user_id: "U123",
-        github_author: "Alice Example <alice@example.com>"
-      })
-    });
-    expect(response.status).toBe(200);
-    expect(calls).toEqual([
-      {
-        slackUserId: "U123",
-        githubAuthor: "Alice Example <alice@example.com>"
-      }
-    ]);
-  });
-
   it("emits admin page inline script without syntax errors", async () => {
     const baseUrl = await startAdminServer({
       SLACK_APP_TOKEN: "xapp-test",
@@ -225,8 +181,6 @@ describe("admin routes", () => {
     } as NodeJS.ProcessEnv, {
       getStatus: async () => ({ ok: true, status: "admin-ok" }),
       addAuthProfile: async () => ({ ok: true }),
-      upsertGitHubAuthorMapping: async () => ({ ok: true }),
-      deleteGitHubAuthorMapping: async () => ({ ok: true }),
       deleteAuthProfile: async () => ({ ok: true }),
       activateAuthProfile: async () => ({ ok: true }),
       deployWorker: async () => ({ ok: true }),
@@ -252,8 +206,6 @@ describe("admin routes", () => {
     } as NodeJS.ProcessEnv, {
       getStatus: async () => ({ ok: true }),
       addAuthProfile: async () => ({ ok: true }),
-      upsertGitHubAuthorMapping: async () => ({ ok: true }),
-      deleteGitHubAuthorMapping: async () => ({ ok: true }),
       deleteAuthProfile: async () => ({ ok: true }),
       activateAuthProfile: async () => ({ ok: true }),
       deployWorker: async (payload: Record<string, unknown>) => {
@@ -290,8 +242,6 @@ describe("admin routes", () => {
     } as NodeJS.ProcessEnv, {
       getStatus: async () => ({ ok: true }),
       addAuthProfile: async () => ({ ok: true }),
-      upsertGitHubAuthorMapping: async () => ({ ok: true }),
-      deleteGitHubAuthorMapping: async () => ({ ok: true }),
       deleteAuthProfile: async () => ({ ok: true }),
       activateAuthProfile: async () => ({ ok: true }),
       deployWorker: async () => ({ ok: true }),
