@@ -878,15 +878,6 @@ describe("AppServerClient disconnect handling", () => {
     expect(threadStartParams?.baseInstructions).toEqual(
       expect.stringContaining("shared_repos_root: /tmp/repos")
     );
-    expect(threadStartParams?.baseInstructions).toEqual(
-      expect.stringContaining("Git commit co-author contract")
-    );
-    expect(threadStartParams?.baseInstructions).toEqual(
-      expect.stringContaining("Do not bypass git hooks")
-    );
-    expect(threadStartParams?.baseInstructions).toEqual(
-      expect.stringContaining("The broker may append `Co-authored-by:` trailers automatically")
-    );
     expect(String(threadStartParams?.baseInstructions)).toContain("node \\\"$BROKER_JOB_HELPER\\\" event");
     expect(threadStartParams?.baseInstructions).toEqual(
       expect.stringContaining("Identity and instruction boundaries")

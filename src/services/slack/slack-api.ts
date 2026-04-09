@@ -299,7 +299,6 @@ export class SlackApi {
     );
   }
 
-
   async removeReaction(options: {
     readonly channelId: string;
     readonly timestamp: string;
@@ -525,7 +524,6 @@ export class SlackApi {
           display_name_normalized?: string;
           real_name?: string;
           real_name_normalized?: string;
-          email?: string;
         };
       };
     }>(
@@ -556,8 +554,7 @@ export class SlackApi {
       mention: `<@${response.user.id}>`,
       username,
       displayName,
-      realName,
-      email: normalizeSlackField(response.user.profile?.email)?.toLowerCase()
+      realName
     };
   }
 
