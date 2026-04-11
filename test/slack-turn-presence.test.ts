@@ -34,7 +34,7 @@ describe("SlackTurnPresence", () => {
     expect(setAssistantThreadStatus).toHaveBeenCalledWith(expect.objectContaining({
       channelId: "C123",
       threadTs: "111.222",
-      status: "is thinking…",
+      status: "Working on your request…",
       loadingMessages: expect.arrayContaining(["正在理解请求"])
     }));
 
@@ -43,7 +43,7 @@ describe("SlackTurnPresence", () => {
     expect(setAssistantThreadStatus).toHaveBeenNthCalledWith(2, {
       channelId: "C123",
       threadTs: "111.222",
-      status: "is thinking…",
+      status: "Working on your request…",
       loadingMessages: ["正在整理回复", "正在压缩关键信息", "已开始组织回复"]
     });
 
@@ -56,7 +56,7 @@ describe("SlackTurnPresence", () => {
     expect(setAssistantThreadStatus).toHaveBeenNthCalledWith(3, {
       channelId: "C123",
       threadTs: "111.222",
-      status: "is thinking…",
+      status: "Working on your request…",
       loadingMessages: ["我在拉最新分支复查，先跑一轮测试和看修复点。", "正在运行测试", "正在等待测试结果", "正在核对输出"]
     });
 
@@ -101,7 +101,7 @@ describe("SlackTurnPresence", () => {
     });
 
     expect(setAssistantThreadStatus).toHaveBeenLastCalledWith(expect.objectContaining({
-      status: "is thinking…",
+      status: "Working on your request…",
       loadingMessages: ["Working in workspace", "Running Bash", "正在等待命令结果", "正在读取输出"]
     }));
 
@@ -115,7 +115,7 @@ describe("SlackTurnPresence", () => {
     });
 
     expect(setAssistantThreadStatus).toHaveBeenLastCalledWith(expect.objectContaining({
-      status: "is thinking…",
+      status: "Working on your request…",
       loadingMessages: ["Working in workspace", "Finished Bash (3s)", "正在处理命令结果", "正在继续处理"]
     }));
   });

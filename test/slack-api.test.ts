@@ -161,7 +161,7 @@ describe("SlackApi assistant status and streaming helpers", () => {
       if (url.endsWith("/assistant.threads.setStatus")) {
         expect(params.get("channel_id")).toBe("C123");
         expect(params.get("thread_ts")).toBe("111.222");
-        expect(params.get("status")).toBe("is thinking…");
+        expect(params.get("status")).toBe("Working on your request…");
         expect(params.get("loading_messages")).toBe(JSON.stringify(["正在理解请求", "正在查看上下文"]));
         return new Response(JSON.stringify({ ok: true }), {
           status: 200,
@@ -259,7 +259,7 @@ describe("SlackApi assistant status and streaming helpers", () => {
     await api.setAssistantThreadStatus({
       channelId: "C123",
       threadTs: "111.222",
-      status: "is thinking…",
+      status: "Working on your request…",
       loadingMessages: ["正在理解请求", "正在查看上下文"]
     });
 

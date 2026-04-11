@@ -9,7 +9,7 @@ const STATUS_REFRESH_MS = 12_000;
 const FALLBACK_PHASE_ADVANCE_MS = 8_000;
 const MAX_LOG_LINE_LENGTH = 140;
 const MAX_LOADING_MESSAGES = 4;
-const DEFAULT_STATUS = "is thinking…";
+const DEFAULT_STATUS = "Working on your request…";
 const MAX_COMMAND_LABEL_LENGTH = 48;
 
 const execFileAsync = promisify(execFile);
